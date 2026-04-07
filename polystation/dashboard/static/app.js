@@ -281,26 +281,31 @@ function bindLogsTab() {
 // ------------------------------------------------------------------ //
 // Markets Panel                                                        //
 // ------------------------------------------------------------------ //
+let _marketsSeq = 0;
+
 async function refreshMarkets(append = false) {
-  if (State.marketsLoading) return;
-  State.marketsLoading = true;
+  // Use a sequence number so stale responses don't overwrite fresh ones
+  const seq = ++_marketsSeq;
   try {
     const tab = State.activeTab;
     const searchQuery = ($("#markets-search")?.value || "").trim();
 
     if (tab === "trending") {
       const data = await apiFetch("/api/markets/trending?limit=50");
+      if (seq !== _marketsSeq) return; // stale
       State.markets = data;
       State.marketsHasMore = false;
     } else if (searchQuery.length >= 2) {
       // Server-side search through events API
       const resp = await apiFetch(`/api/markets/search?q=${encodeURIComponent(searchQuery)}&limit=100`);
+      if (seq !== _marketsSeq) return; // stale
       State.markets = resp.data || [];
       State.marketsHasMore = false;
       State.marketsOffset = 0;
     } else {
       const offset = append ? State.marketsOffset : 0;
       const resp = await apiFetch(`/api/markets/?offset=${offset}&limit=100`);
+      if (seq !== _marketsSeq) return; // stale
       const newData = resp.data || [];
       if (append) {
         State.markets = State.markets.concat(newData);
@@ -314,9 +319,7 @@ async function refreshMarkets(append = false) {
     const cnt = $("#markets-count");
     if (cnt) cnt.textContent = `${State.markets.length}${State.marketsHasMore ? "+" : ""}`;
   } catch (e) {
-    addLog("ERROR", `Markets fetch failed: ${e.message}`);
-  } finally {
-    State.marketsLoading = false;
+    if (seq === _marketsSeq) addLog("ERROR", `Markets fetch failed: ${e.message}`);
   }
 }
 
@@ -958,13 +961,16 @@ function startPolling(intervalSec) {
   const ms = ((intervalSec && intervalSec > 0) ? intervalSec : 5) * 1000;
   if (State.refreshTimer) clearInterval(State.refreshTimer);
   State.refreshTimer = setInterval(async () => {
-    await Promise.allSettled([
-      refreshMarkets(),
+    // Skip market refresh if user has a search active (don't overwrite results)
+    const searchActive = ($("#markets-search")?.value || "").trim().length >= 2;
+    const fetches = [
       refreshStrategies(),
       refreshOrders(),
       refreshPortfolio(),
       refreshHealth(),
-    ]);
+    ];
+    if (!searchActive) fetches.push(refreshMarkets());
+    await Promise.allSettled(fetches);
     if (State.selectedMarket) refreshOrderBook();
   }, ms);
 }
