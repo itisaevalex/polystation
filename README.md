@@ -9,6 +9,8 @@
 
 **Full Polymarket trading station.** Pluggable strategy kernels, live web dashboard, real-time market data, order execution, and portfolio tracking.
 
+![Polystation Dashboard](data/dashboard.png)
+
 ---
 
 ## Architecture

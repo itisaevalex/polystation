@@ -61,12 +61,14 @@ def create_app() -> FastAPI:
     from polystation.dashboard.api.orders import router as orders_router
     from polystation.dashboard.api.strategies import router as strategies_router
     from polystation.dashboard.api.portfolio import router as portfolio_router
+    from polystation.dashboard.api.config import router as config_router
     from polystation.dashboard.ws import router as ws_router
 
     app.include_router(markets_router, prefix="/api/markets", tags=["markets"])
     app.include_router(orders_router, prefix="/api/orders", tags=["orders"])
     app.include_router(strategies_router, prefix="/api/strategies", tags=["strategies"])
     app.include_router(portfolio_router, prefix="/api/portfolio", tags=["portfolio"])
+    app.include_router(config_router, prefix="/api/config", tags=["config"])
     app.include_router(ws_router, tags=["websocket"])
 
     # ------------------------------------------------------------------ #

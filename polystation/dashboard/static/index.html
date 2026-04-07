@@ -53,258 +53,401 @@
   </header>
 
   <!-- ============================================================
-       MAIN GRID
+       NAVIGATION TABS
        ============================================================ -->
-  <div id="main">
+  <nav id="nav-bar">
+    <button class="nav-tab active" data-tab="trading">Trading</button>
+    <button class="nav-tab" data-tab="logs">Logs</button>
+    <button class="nav-tab" data-tab="settings">Settings</button>
+  </nav>
 
-    <!-- ==================== MARKETS ==================== -->
-    <div class="panel" id="panel-markets">
-      <div class="panel-header">
-        <span class="panel-title">Markets</span>
-        <div class="panel-actions">
-          <span id="markets-count" class="panel-badge">—</span>
-        </div>
-      </div>
+  <!-- ============================================================
+       TRADING TAB
+       ============================================================ -->
+  <div id="tab-trading" class="tab-content active">
 
-      <!-- Tabs: Active / Trending -->
-      <div id="markets-tabs">
-        <button class="markets-tab active" data-tab="active">Active</button>
-        <button class="markets-tab" data-tab="trending">Trending</button>
-      </div>
+    <!-- ==================== MAIN GRID ==================== -->
+    <div id="main">
 
-      <!-- Search box -->
-      <div id="markets-search-wrap">
-        <input
-          type="text"
-          id="markets-search"
-          placeholder="Filter markets…"
-          autocomplete="off"
-          spellcheck="false"
-        />
-      </div>
-
-      <!-- Markets table -->
-      <div class="panel-content">
-        <table class="data-table" id="tbl-markets">
-          <thead>
-            <tr>
-              <th>Question</th>
-              <th class="text-right">Bid</th>
-              <th class="text-right">Ask</th>
-              <th class="text-right">Volume</th>
-              <th class="text-right">Last</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td colspan="5">
-                <div class="state-loading"><div class="spinner"></div> Loading markets…</div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ==================== ORDER BOOK ==================== -->
-    <div class="panel" id="panel-orderbook">
-      <div class="panel-header">
-        <span class="panel-title">Order Book</span>
-        <div class="panel-actions">
-          <button class="btn btn-sm" onclick="refreshOrderBook()" title="Refresh order book">&#8635;</button>
-        </div>
-      </div>
-
-      <!-- Market question + outcome token tabs -->
-      <div style="padding: 5px 12px; border-bottom: 1px solid var(--border); background: var(--bg-panel-alt); flex-shrink: 0;">
-        <div id="ob-market-question" class="truncate text-secondary" style="font-size:11px; margin-bottom:4px;">
-          Select a market from the left panel
-        </div>
-        <div id="ob-token-tabs" style="display:flex; gap:4px;"></div>
-      </div>
-
-      <!-- Pricing summary bar -->
-      <div id="ob-header-info">
-        <div class="ob-stat">
-          <span class="lbl">MID</span>
-          <span class="val text-primary" id="ob-midpoint">—</span>
-        </div>
-        <div class="ob-stat">
-          <span class="lbl">BID</span>
-          <span class="val text-green" id="ob-best-bid">—</span>
-        </div>
-        <div class="ob-stat">
-          <span class="lbl">ASK</span>
-          <span class="val text-red" id="ob-best-ask">—</span>
-        </div>
-        <div class="ob-stat">
-          <span class="lbl">SPREAD</span>
-          <span class="val text-secondary" id="ob-spread">—</span>
-        </div>
-      </div>
-
-      <!-- Bid / Ask columns -->
-      <div id="ob-content">
-        <div class="ob-side ob-bids">
-          <div class="ob-side-header bids-header">
-            <span>BIDS</span><span>SIZE</span>
-          </div>
-          <div id="ob-bids">
-            <div class="state-empty">No data</div>
+      <!-- ==================== MARKETS ==================== -->
+      <div class="panel" id="panel-markets">
+        <div class="panel-header">
+          <span class="panel-title">Markets</span>
+          <div class="panel-actions">
+            <span id="markets-count" class="panel-badge">—</span>
           </div>
         </div>
-        <div class="ob-side ob-asks">
-          <div class="ob-side-header asks-header">
-            <span>ASKS</span><span>SIZE</span>
-          </div>
-          <div id="ob-asks">
-            <div class="state-empty">No data</div>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- ==================== STRATEGIES ==================== -->
-    <div class="panel" id="panel-strategies">
-      <div class="panel-header">
-        <span class="panel-title">Strategies</span>
-        <div class="panel-actions">
-          <button class="btn btn-sm" onclick="refreshStrategies()" title="Refresh strategies">&#8635;</button>
+        <!-- Tabs: Active / Trending -->
+        <div id="markets-tabs">
+          <button class="markets-tab active" data-tab="active">Active</button>
+          <button class="markets-tab" data-tab="trending">Trending</button>
         </div>
-      </div>
 
-      <div class="panel-content">
-        <div id="strategies-list">
-          <div class="state-loading"><div class="spinner"></div> Loading…</div>
-        </div>
-      </div>
-
-      <!-- Start kernel form -->
-      <div id="start-kernel-form">
-        <div style="font-size:9px; color:var(--text-label); letter-spacing:1px; margin-bottom:6px; text-transform:uppercase;">Start Kernel</div>
-        <div class="form-row">
-          <select id="kernel-select" class="form-select">
-            <option value="">Loading…</option>
-          </select>
-          <button id="btn-start-kernel" class="btn btn-green btn-sm">START</button>
-        </div>
-        <div class="form-row" style="margin-top:4px;">
+        <!-- Search box -->
+        <div id="markets-search-wrap">
           <input
             type="text"
-            id="kernel-token-id"
-            class="form-input"
-            placeholder="token_id (auto-fills from selected market)"
-            style="flex:1;"
+            id="markets-search"
+            placeholder="Filter markets…"
             autocomplete="off"
             spellcheck="false"
           />
         </div>
+
+        <!-- Markets table -->
+        <div class="panel-content">
+          <table class="data-table" id="tbl-markets">
+            <thead>
+              <tr>
+                <th>Question</th>
+                <th class="text-right">Bid</th>
+                <th class="text-right">Ask</th>
+                <th class="text-right">Volume</th>
+                <th class="text-right">Last</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="5">
+                  <div class="state-loading"><div class="spinner"></div> Loading markets…</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      <!-- ==================== ORDER BOOK ==================== -->
+      <div class="panel" id="panel-orderbook">
+        <div class="panel-header">
+          <span class="panel-title">Order Book</span>
+          <div class="panel-actions">
+            <button class="btn btn-sm" onclick="refreshOrderBook()" title="Refresh order book">&#8635;</button>
+          </div>
+        </div>
+
+        <!-- Market question + outcome token tabs -->
+        <div style="padding: 5px 12px; border-bottom: 1px solid var(--border); background: var(--bg-panel-alt); flex-shrink: 0;">
+          <div id="ob-market-question" class="truncate text-secondary" style="font-size:11px; margin-bottom:4px;">
+            Select a market from the left panel
+          </div>
+          <div id="ob-token-tabs" style="display:flex; gap:4px;"></div>
+        </div>
+
+        <!-- Pricing summary bar -->
+        <div id="ob-header-info">
+          <div class="ob-stat">
+            <span class="lbl">MID</span>
+            <span class="val text-primary" id="ob-midpoint">—</span>
+          </div>
+          <div class="ob-stat">
+            <span class="lbl">BID</span>
+            <span class="val text-green" id="ob-best-bid">—</span>
+          </div>
+          <div class="ob-stat">
+            <span class="lbl">ASK</span>
+            <span class="val text-red" id="ob-best-ask">—</span>
+          </div>
+          <div class="ob-stat">
+            <span class="lbl">SPREAD</span>
+            <span class="val text-secondary" id="ob-spread">—</span>
+          </div>
+        </div>
+
+        <!-- Bid / Ask columns -->
+        <div id="ob-content">
+          <div class="ob-side ob-bids">
+            <div class="ob-side-header bids-header">
+              <span>BIDS</span><span>SIZE</span>
+            </div>
+            <div id="ob-bids">
+              <div class="state-empty">No data</div>
+            </div>
+          </div>
+          <div class="ob-side ob-asks">
+            <div class="ob-side-header asks-header">
+              <span>ASKS</span><span>SIZE</span>
+            </div>
+            <div id="ob-asks">
+              <div class="state-empty">No data</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== STRATEGIES ==================== -->
+      <div class="panel" id="panel-strategies">
+        <div class="panel-header">
+          <span class="panel-title">Strategies</span>
+          <div class="panel-actions">
+            <button class="btn btn-sm" onclick="refreshStrategies()" title="Refresh strategies">&#8635;</button>
+          </div>
+        </div>
+
+        <div class="panel-content">
+          <div id="strategies-list">
+            <div class="state-loading"><div class="spinner"></div> Loading…</div>
+          </div>
+        </div>
+
+        <!-- Start kernel form -->
+        <div id="start-kernel-form">
+          <div style="font-size:9px; color:var(--text-label); letter-spacing:1px; margin-bottom:6px; text-transform:uppercase;">Start Kernel</div>
+          <div class="form-row">
+            <select id="kernel-select" class="form-select">
+              <option value="">Loading…</option>
+            </select>
+            <button id="btn-start-kernel" class="btn btn-green btn-sm">START</button>
+          </div>
+          <div class="form-row" style="margin-top:4px;">
+            <input
+              type="text"
+              id="kernel-token-id"
+              class="form-input"
+              placeholder="token_id (auto-fills from selected market)"
+              style="flex:1;"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== ORDERS ==================== -->
+      <div class="panel" id="panel-orders">
+        <div class="panel-header">
+          <span class="panel-title">Orders</span>
+          <div class="panel-actions">
+            <span id="orders-active-count" class="panel-badge">—</span>
+            <button class="btn btn-sm" onclick="refreshOrders()" title="Refresh orders">&#8635;</button>
+          </div>
+        </div>
+
+        <div class="panel-content">
+          <table class="data-table" id="tbl-orders">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Side</th>
+                <th class="text-right">Price</th>
+                <th class="text-right">Size</th>
+                <th>Status</th>
+                <th>Kernel</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="6">
+                  <div class="state-loading"><div class="spinner"></div> Loading orders…</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ==================== PORTFOLIO ==================== -->
+      <div class="panel" id="panel-portfolio">
+        <div class="panel-header">
+          <span class="panel-title">Portfolio</span>
+          <div class="panel-actions">
+            <button class="btn btn-sm" onclick="refreshPortfolio()" title="Refresh portfolio">&#8635;</button>
+          </div>
+        </div>
+
+        <!-- P&L Summary bar -->
+        <div id="pnl-summary">
+          <div class="pnl-cell">
+            <div class="lbl">Realized P&L</div>
+            <div id="pnl-realized" class="val neu">$0.0000</div>
+          </div>
+          <div class="pnl-cell">
+            <div class="lbl">Unrealized P&L</div>
+            <div id="pnl-unrealized" class="val neu">$0.0000</div>
+          </div>
+          <div class="pnl-cell">
+            <div class="lbl">Total P&L</div>
+            <div id="pnl-total" class="val neu">$0.0000</div>
+          </div>
+        </div>
+
+        <!-- Positions table -->
+        <div class="panel-content">
+          <table class="data-table" id="tbl-portfolio">
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Side</th>
+                <th class="text-right">Entry</th>
+                <th class="text-right">Current</th>
+                <th class="text-right">Size</th>
+                <th class="text-right">Unr. P&L</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="6">
+                  <div class="state-empty">No open positions</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ==================== RESIZE HANDLES ==================== -->
+      <div class="gutter gutter-col" id="gutter-col-1" style="grid-row: 1 / 3; grid-column: 1;"></div>
+      <div class="gutter gutter-col" id="gutter-col-2" style="grid-row: 1 / 3; grid-column: 3;"></div>
+      <div class="gutter gutter-row" id="gutter-row-mid" style="grid-row: 1; grid-column: 2;"></div>
+      <div class="gutter gutter-row" id="gutter-row-right" style="grid-row: 1; grid-column: 3;"></div>
+
+    </div><!-- /#main -->
+
+    <!-- Horizontal gutter between main and trade log -->
+    <div class="gutter gutter-horizontal" id="gutter-bottom"></div>
+
+    <!-- ==================== TRADE LOG (bottom bar) ==================== -->
+    <div id="trade-log">
+      <div id="trade-log-header">
+        <span id="trade-log-title">Trade Log</span>
+        <button id="btn-clear-log" class="btn btn-sm">Clear</button>
+      </div>
+      <div id="trade-log-entries"></div>
     </div>
 
-    <!-- ==================== ORDERS ==================== -->
-    <div class="panel" id="panel-orders">
-      <div class="panel-header">
-        <span class="panel-title">Orders</span>
-        <div class="panel-actions">
-          <span id="orders-active-count" class="panel-badge">—</span>
-          <button class="btn btn-sm" onclick="refreshOrders()" title="Refresh orders">&#8635;</button>
-        </div>
-      </div>
-
-      <div class="panel-content">
-        <table class="data-table" id="tbl-orders">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Side</th>
-              <th class="text-right">Price</th>
-              <th class="text-right">Size</th>
-              <th>Status</th>
-              <th>Kernel</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td colspan="6">
-                <div class="state-loading"><div class="spinner"></div> Loading orders…</div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ==================== PORTFOLIO ==================== -->
-    <div class="panel" id="panel-portfolio">
-      <div class="panel-header">
-        <span class="panel-title">Portfolio</span>
-        <div class="panel-actions">
-          <button class="btn btn-sm" onclick="refreshPortfolio()" title="Refresh portfolio">&#8635;</button>
-        </div>
-      </div>
-
-      <!-- P&L Summary bar -->
-      <div id="pnl-summary">
-        <div class="pnl-cell">
-          <div class="lbl">Realized P&L</div>
-          <div id="pnl-realized" class="val neu">$0.0000</div>
-        </div>
-        <div class="pnl-cell">
-          <div class="lbl">Unrealized P&L</div>
-          <div id="pnl-unrealized" class="val neu">$0.0000</div>
-        </div>
-        <div class="pnl-cell">
-          <div class="lbl">Total P&L</div>
-          <div id="pnl-total" class="val neu">$0.0000</div>
-        </div>
-      </div>
-
-      <!-- Positions table -->
-      <div class="panel-content">
-        <table class="data-table" id="tbl-portfolio">
-          <thead>
-            <tr>
-              <th>Token</th>
-              <th>Side</th>
-              <th class="text-right">Entry</th>
-              <th class="text-right">Current</th>
-              <th class="text-right">Size</th>
-              <th class="text-right">Unr. P&L</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td colspan="6">
-                <div class="state-empty">No open positions</div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ==================== RESIZE HANDLES ==================== -->
-    <div class="gutter gutter-col" id="gutter-col-1" style="grid-row: 1 / 3; grid-column: 1;"></div>
-    <div class="gutter gutter-col" id="gutter-col-2" style="grid-row: 1 / 3; grid-column: 3;"></div>
-    <div class="gutter gutter-row" id="gutter-row-mid" style="grid-row: 1; grid-column: 2;"></div>
-    <div class="gutter gutter-row" id="gutter-row-right" style="grid-row: 1; grid-column: 3;"></div>
-
-  </div><!-- /#main -->
-
-  <!-- Horizontal gutter between main and trade log -->
-  <div class="gutter gutter-horizontal" id="gutter-bottom"></div>
+  </div><!-- /#tab-trading -->
 
   <!-- ============================================================
-       TRADE LOG (bottom bar)
+       LOGS TAB
        ============================================================ -->
-  <div id="trade-log">
-    <div id="trade-log-header">
-      <span id="trade-log-title">Trade Log</span>
-      <button id="btn-clear-log" class="btn btn-sm">Clear</button>
+  <div id="tab-logs" class="tab-content" style="display:none;">
+
+    <div id="logs-toolbar">
+      <div id="logs-filter-btns">
+        <button class="log-filter-btn active" data-level="ALL">ALL</button>
+        <button class="log-filter-btn" data-level="INFO">INFO</button>
+        <button class="log-filter-btn" data-level="TRADE">TRADE</button>
+        <button class="log-filter-btn" data-level="WARN">WARN</button>
+        <button class="log-filter-btn" data-level="ERROR">ERROR</button>
+      </div>
+      <div id="logs-toolbar-actions">
+        <span id="logs-count-badge" class="panel-badge">0 entries</span>
+        <button id="btn-export-logs" class="btn btn-sm">Export</button>
+        <button id="btn-clear-logs-tab" class="btn btn-sm">Clear</button>
+      </div>
     </div>
-    <div id="trade-log-entries"></div>
-  </div>
+
+    <div id="logs-viewer">
+      <div id="logs-entries"></div>
+    </div>
+
+  </div><!-- /#tab-logs -->
+
+  <!-- ============================================================
+       SETTINGS TAB
+       ============================================================ -->
+  <div id="tab-settings" class="tab-content" style="display:none;">
+
+    <div id="settings-scroll">
+      <div id="settings-container">
+
+        <!-- API Credentials -->
+        <div class="settings-section">
+          <div class="settings-section-header">API Credentials</div>
+          <div class="settings-note">Credentials are stored in memory only and not persisted to disk.</div>
+
+          <div class="settings-field">
+            <label class="settings-label" for="s-host">HOST</label>
+            <input type="text" id="s-host" class="settings-input" value="https://clob.polymarket.com" autocomplete="off" spellcheck="false" />
+          </div>
+
+          <div class="settings-field">
+            <label class="settings-label" for="s-pk">Private Key (PK)</label>
+            <input type="password" id="s-pk" class="settings-input" placeholder="0x…" autocomplete="new-password" />
+          </div>
+
+          <div class="settings-field">
+            <label class="settings-label" for="s-pbk">Public Key (PBK)</label>
+            <input type="text" id="s-pbk" class="settings-input" placeholder="0x…" autocomplete="off" spellcheck="false" />
+          </div>
+
+          <div class="settings-field">
+            <label class="settings-label" for="s-clob-api-key">CLOB API Key</label>
+            <input type="text" id="s-clob-api-key" class="settings-input" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off" spellcheck="false" />
+          </div>
+
+          <div class="settings-field">
+            <label class="settings-label" for="s-clob-secret">CLOB Secret</label>
+            <input type="password" id="s-clob-secret" class="settings-input" placeholder="…" autocomplete="new-password" />
+          </div>
+
+          <div class="settings-field">
+            <label class="settings-label" for="s-clob-passphrase">CLOB Passphrase</label>
+            <input type="password" id="s-clob-passphrase" class="settings-input" placeholder="…" autocomplete="new-password" />
+          </div>
+
+          <div class="settings-actions">
+            <button id="btn-save-credentials" class="btn btn-green">Save Credentials</button>
+            <span id="credentials-save-status" class="settings-status"></span>
+          </div>
+        </div>
+
+        <!-- Trading Settings -->
+        <div class="settings-section">
+          <div class="settings-section-header">Trading Settings</div>
+
+          <div class="settings-field settings-field-toggle">
+            <label class="settings-label" for="s-dry-run">Dry Run Mode</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="s-dry-run" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-field">
+            <label class="settings-label" for="s-max-daily-vol">Max Daily Volume ($)</label>
+            <input type="number" id="s-max-daily-vol" class="settings-input settings-input-short" min="0" step="100" placeholder="0 = unlimited" />
+          </div>
+
+          <div class="settings-field settings-field-toggle">
+            <label class="settings-label" for="s-prevent-dupes">Prevent Duplicate Trades</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="s-prevent-dupes" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-actions">
+            <button id="btn-save-trading" class="btn btn-green">Save Settings</button>
+            <span id="trading-save-status" class="settings-status"></span>
+          </div>
+        </div>
+
+        <!-- Dashboard Settings -->
+        <div class="settings-section">
+          <div class="settings-section-header">Dashboard Settings</div>
+
+          <div class="settings-field">
+            <label class="settings-label" for="s-refresh-interval">Refresh Interval (seconds)</label>
+            <input type="number" id="s-refresh-interval" class="settings-input settings-input-short" min="1" max="60" value="5" />
+          </div>
+
+          <div class="settings-field">
+            <label class="settings-label" for="s-market-page-size">Market Page Size</label>
+            <input type="number" id="s-market-page-size" class="settings-input settings-input-short" min="10" max="500" value="100" />
+          </div>
+
+          <div class="settings-actions">
+            <button id="btn-save-dashboard" class="btn btn-green">Save Settings</button>
+            <span id="dashboard-save-status" class="settings-status"></span>
+          </div>
+        </div>
+
+      </div><!-- /#settings-container -->
+    </div><!-- /#settings-scroll -->
+
+  </div><!-- /#tab-settings -->
 
 </div><!-- /#app -->
 

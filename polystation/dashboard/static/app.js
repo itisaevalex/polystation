@@ -174,25 +174,107 @@ function setConnStatus(state) {
 }
 
 // ------------------------------------------------------------------ //
+// Log data store (single source of truth shared by both views)         //
+// ------------------------------------------------------------------ //
+const LogStore = {
+  entries: [],  // Array of { time, level, msg, ts }
+  maxEntries: 500,
+};
+
+// ------------------------------------------------------------------ //
 // Trade Log                                                            //
 // ------------------------------------------------------------------ //
 function addLog(level, msg) {
-  const container = $("#trade-log-entries");
   const now = new Date();
   const time = now.toLocaleTimeString("en-US", { hour12: false });
 
-  const entry = document.createElement("div");
-  entry.className = "log-entry";
-  entry.innerHTML = `
-    <span class="log-time">${escHtml(time)}</span>
-    <span class="log-level ${escHtml(level)}">${escHtml(level)}</span>
-    <span class="log-msg">${escHtml(msg)}</span>
-  `;
-  container.prepend(entry);
+  const entry = { time, level, msg, ts: now.getTime() };
+  LogStore.entries.unshift(entry);
+  if (LogStore.entries.length > LogStore.maxEntries) {
+    LogStore.entries.length = LogStore.maxEntries;
+  }
 
-  // Keep max 200 entries
-  while (container.children.length > 200) {
-    container.removeChild(container.lastChild);
+  // Render into the trading tab's trade log panel
+  const container = $("#trade-log-entries");
+  if (container) {
+    const el = document.createElement("div");
+    el.className = "log-entry";
+    el.innerHTML = `
+      <span class="log-time">${escHtml(time)}</span>
+      <span class="log-level ${escHtml(level)}">${escHtml(level)}</span>
+      <span class="log-msg">${escHtml(msg)}</span>
+    `;
+    container.prepend(el);
+    while (container.children.length > 200) {
+      container.removeChild(container.lastChild);
+    }
+  }
+
+  // Mirror into the full-screen logs tab viewer
+  renderLogsTab();
+}
+
+// ------------------------------------------------------------------ //
+// Logs Tab                                                             //
+// ------------------------------------------------------------------ //
+let logsActiveFilter = "ALL";
+
+function renderLogsTab() {
+  const container = $("#logs-entries");
+  if (!container) return;
+
+  const filtered = logsActiveFilter === "ALL"
+    ? LogStore.entries
+    : LogStore.entries.filter(e => e.level === logsActiveFilter);
+
+  container.innerHTML = filtered.map(e => `
+    <div class="log-entry">
+      <span class="log-time">${escHtml(e.time)}</span>
+      <span class="log-level ${escHtml(e.level)}">${escHtml(e.level)}</span>
+      <span class="log-msg">${escHtml(e.msg)}</span>
+    </div>
+  `).join("");
+
+  const badge = $("#logs-count-badge");
+  if (badge) badge.textContent = `${filtered.length} entr${filtered.length === 1 ? "y" : "ies"}`;
+}
+
+function bindLogsTab() {
+  // Filter buttons
+  $$(".log-filter-btn[data-level]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      $$(".log-filter-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      logsActiveFilter = btn.getAttribute("data-level");
+      renderLogsTab();
+    });
+  });
+
+  // Clear button
+  const clearBtn = $("#btn-clear-logs-tab");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      LogStore.entries = [];
+      renderLogsTab();
+      // Also clear the trade panel log
+      const container = $("#trade-log-entries");
+      if (container) container.innerHTML = "";
+    });
+  }
+
+  // Export button
+  const exportBtn = $("#btn-export-logs");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", () => {
+      const lines = LogStore.entries.map(e => `[${e.time}] [${e.level}] ${e.msg}`).join("\n");
+      const blob = new Blob([lines], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `polystation-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
   }
 }
 
@@ -238,9 +320,20 @@ function renderMarkets() {
   const tbody = $("#tbl-markets tbody");
   if (!tbody) return;
 
-  const query = ($("#markets-search")?.value || "").toLowerCase().trim();
+  const rawQuery = ($("#markets-search")?.value || "").toLowerCase().trim();
+  // Expand common abbreviations for better search
+  const ALIASES = {
+    "btc": "bitcoin", "eth": "ethereum", "sol": "solana",
+    "doge": "dogecoin", "xrp": "ripple", "gta": "gta vi",
+    "nfl": "football", "nba": "basketball", "ufc": "fight",
+  };
+  const query = ALIASES[rawQuery] || rawQuery;
   const markets = query
-    ? State.markets.filter(m => m.question.toLowerCase().includes(query))
+    ? State.markets.filter(m => {
+        const q = m.question.toLowerCase();
+        const s = (m.slug || "").toLowerCase();
+        return q.includes(query) || s.includes(query);
+      })
     : State.markets;
 
   if (markets.length === 0) {
@@ -677,21 +770,183 @@ function bindSearchInput() {
 }
 
 // ------------------------------------------------------------------ //
-// Clear log button                                                      //
+// Clear log button (trading tab panel)                                 //
 // ------------------------------------------------------------------ //
 function bindClearLog() {
   const btn = $("#btn-clear-log");
   if (!btn) return;
   btn.addEventListener("click", () => {
+    LogStore.entries = [];
     const container = $("#trade-log-entries");
     if (container) container.innerHTML = "";
+    renderLogsTab();
   });
+}
+
+// ------------------------------------------------------------------ //
+// Navigation tabs                                                       //
+// ------------------------------------------------------------------ //
+function bindNavTabs() {
+  document.querySelectorAll(".nav-tab[data-tab]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".nav-tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".tab-content").forEach(t => {
+        t.classList.remove("active");
+        t.style.display = "none";
+      });
+      const tab = document.getElementById(`tab-${btn.dataset.tab}`);
+      if (tab) {
+        tab.classList.add("active");
+        tab.style.display = btn.dataset.tab === "trading" ? "grid" : "flex";
+        // Refresh logs view when switching to logs tab
+        if (btn.dataset.tab === "logs") renderLogsTab();
+        // Load settings values when switching to settings tab
+        if (btn.dataset.tab === "settings") loadSettingsFromStorage();
+      }
+    });
+  });
+}
+
+// ------------------------------------------------------------------ //
+// Settings tab                                                          //
+// ------------------------------------------------------------------ //
+const SETTINGS_KEY = "polystation_settings";
+
+function loadSettingsFromStorage() {
+  const raw = localStorage.getItem(SETTINGS_KEY);
+  if (!raw) return;
+  try {
+    const saved = JSON.parse(raw);
+    if (saved.host)            { const el = $("#s-host");            if (el) el.value = saved.host; }
+    if (saved.pbk)             { const el = $("#s-pbk");             if (el) el.value = saved.pbk; }
+    if (saved.clobApiKey)      { const el = $("#s-clob-api-key");    if (el) el.value = saved.clobApiKey; }
+    if (saved.maxDailyVol != null) { const el = $("#s-max-daily-vol"); if (el) el.value = saved.maxDailyVol; }
+    if (saved.preventDupes != null) {
+      const el = $("#s-prevent-dupes");
+      if (el) el.checked = saved.preventDupes;
+    }
+    if (saved.dryRun != null) {
+      const el = $("#s-dry-run");
+      if (el) el.checked = saved.dryRun;
+    }
+    if (saved.refreshInterval != null) {
+      const el = $("#s-refresh-interval");
+      if (el) el.value = saved.refreshInterval;
+    }
+    if (saved.marketPageSize != null) {
+      const el = $("#s-market-page-size");
+      if (el) el.value = saved.marketPageSize;
+    }
+  } catch { /* ignore corrupt storage */ }
+}
+
+function showStatus(el, message, isError) {
+  if (!el) return;
+  el.textContent = message;
+  el.className = `settings-status ${isError ? "error" : "visible"}`;
+  if (!isError) {
+    setTimeout(() => { el.className = "settings-status"; }, 2500);
+  }
+}
+
+function bindSettingsTab() {
+  // Save Credentials
+  const saveCredsBtn = $("#btn-save-credentials");
+  if (saveCredsBtn) {
+    saveCredsBtn.addEventListener("click", () => {
+      const statusEl = $("#credentials-save-status");
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      const existing = raw ? JSON.parse(raw) : {};
+      const updated = {
+        ...existing,
+        host:       ($("#s-host")?.value || "").trim(),
+        pbk:        ($("#s-pbk")?.value || "").trim(),
+        clobApiKey: ($("#s-clob-api-key")?.value || "").trim(),
+      };
+      // Never persist secrets — only non-sensitive values stored
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
+      showStatus(statusEl, "Saved (secrets not persisted)", false);
+    });
+  }
+
+  // Save Trading settings
+  const saveTradingBtn = $("#btn-save-trading");
+  if (saveTradingBtn) {
+    saveTradingBtn.addEventListener("click", async () => {
+      const statusEl = $("#trading-save-status");
+      const dryRunEl = $("#s-dry-run");
+      const maxVolEl = $("#s-max-daily-vol");
+      const prevDupesEl = $("#s-prevent-dupes");
+
+      const dryRun = dryRunEl ? dryRunEl.checked : true;
+
+      // Call backend to update dry-run mode
+      try {
+        await apiPost(`/api/config/dry-run?enabled=${dryRun}`, {});
+        const badge = $("#dry-run-badge");
+        if (badge) badge.style.display = dryRun ? "" : "none";
+        addLog("INFO", `Dry run mode set to: ${dryRun}`);
+      } catch (e) {
+        showStatus(statusEl, `API error: ${e.message}`, true);
+        return;
+      }
+
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      const existing = raw ? JSON.parse(raw) : {};
+      const updated = {
+        ...existing,
+        dryRun,
+        maxDailyVol:  maxVolEl ? (Number(maxVolEl.value) || 0) : 0,
+        preventDupes: prevDupesEl ? prevDupesEl.checked : false,
+      };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
+      showStatus(statusEl, "Settings saved", false);
+    });
+  }
+
+  // Save Dashboard settings
+  const saveDashBtn = $("#btn-save-dashboard");
+  if (saveDashBtn) {
+    saveDashBtn.addEventListener("click", () => {
+      const statusEl = $("#dashboard-save-status");
+      const intervalEl = $("#s-refresh-interval");
+      const pageSizeEl = $("#s-market-page-size");
+
+      const refreshInterval = intervalEl ? (parseInt(intervalEl.value, 10) || 5) : 5;
+      const marketPageSize  = pageSizeEl ? (parseInt(pageSizeEl.value, 10) || 100) : 100;
+
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      const existing = raw ? JSON.parse(raw) : {};
+      const updated = { ...existing, refreshInterval, marketPageSize };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
+
+      // Apply refresh interval immediately
+      startPolling(refreshInterval);
+
+      showStatus(statusEl, "Settings saved", false);
+    });
+  }
+
+  // Sync dry-run state from server on tab load
+  syncDryRunFromServer();
+}
+
+async function syncDryRunFromServer() {
+  try {
+    const data = await apiFetch("/api/config/dry-run");
+    const el = $("#s-dry-run");
+    if (el) el.checked = data.dry_run;
+    const badge = $("#dry-run-badge");
+    if (badge) badge.style.display = data.dry_run ? "" : "none";
+  } catch { /* server may not have this endpoint yet; ignore */ }
 }
 
 // ------------------------------------------------------------------ //
 // Periodic refresh                                                      //
 // ------------------------------------------------------------------ //
-function startPolling() {
+function startPolling(intervalSec) {
+  const ms = ((intervalSec && intervalSec > 0) ? intervalSec : 5) * 1000;
   if (State.refreshTimer) clearInterval(State.refreshTimer);
   State.refreshTimer = setInterval(async () => {
     await Promise.allSettled([
@@ -702,7 +957,7 @@ function startPolling() {
       refreshHealth(),
     ]);
     if (State.selectedMarket) refreshOrderBook();
-  }, 5000);
+  }, ms);
 }
 
 // ------------------------------------------------------------------ //
@@ -712,10 +967,16 @@ async function init() {
   addLog("INFO", "Polystation dashboard initializing…");
 
   // Wire up UI events
+  bindNavTabs();
   bindMarketTabs();
   bindSearchInput();
   bindStartForm();
   bindClearLog();
+  bindLogsTab();
+  bindSettingsTab();
+
+  // Load persisted settings
+  loadSettingsFromStorage();
 
   // First-load data fetches (in parallel)
   await Promise.allSettled([
@@ -732,8 +993,10 @@ async function init() {
   // WebSocket for real-time pushes
   connectWS();
 
-  // Polling fallback every 5 seconds
-  startPolling();
+  // Polling fallback — use saved interval if available
+  const raw = localStorage.getItem(SETTINGS_KEY);
+  const savedInterval = raw ? (JSON.parse(raw).refreshInterval || 5) : 5;
+  startPolling(savedInterval);
 }
 
 /* ================================================================
@@ -743,8 +1006,7 @@ async function init() {
 (function initResizeHandles() {
 
   const main = document.getElementById("main");
-  const app  = document.getElementById("app");
-  if (!main || !app) return;
+  if (!main) return;
 
   // Current sizes (pixels) — start from CSS defaults
   let colSizes = null;   // [col1, col2, col3] in px
@@ -768,7 +1030,8 @@ async function init() {
   }
 
   function applyLogHeight() {
-    app.style.gridTemplateRows = `44px 1fr 5px ${logHeight}px`;
+    const tradingTab = document.getElementById("tab-trading");
+    if (tradingTab) tradingTab.style.gridTemplateRows = `1fr 5px ${logHeight}px`;
   }
 
   // Generic drag handler
