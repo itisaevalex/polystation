@@ -24,6 +24,16 @@ const State = {
   ws:              null,
   wsRetry:         0,
   refreshTimer:    null,
+  // Performance tab
+  perfSummary:     null,
+  perfPnlHistory:  [],
+  perfTrades:      [],
+  perfKernels:     [],
+  perfPnlChart:    null,   // Chart.js instance
+  perfRefreshTimer: null,
+  // Risk tab
+  riskSummary:     null,
+  riskPositions:   [],
 };
 
 // ------------------------------------------------------------------ //
@@ -794,6 +804,371 @@ function bindClearLog() {
 }
 
 // ------------------------------------------------------------------ //
+// Performance Tab                                                       //
+// ------------------------------------------------------------------ //
+async function refreshPerformance() {
+  try {
+    const [summary, history, trades, kernels] = await Promise.allSettled([
+      apiFetch("/api/performance/summary"),
+      apiFetch("/api/performance/pnl-history"),
+      apiFetch("/api/performance/trades"),
+      apiFetch("/api/performance/kernels"),
+    ]);
+
+    if (summary.status === "fulfilled") {
+      State.perfSummary = summary.value;
+      renderPerfSummary(summary.value);
+    }
+    if (history.status === "fulfilled") {
+      State.perfPnlHistory = history.value;
+      renderPnlChart(history.value);
+    }
+    if (trades.status === "fulfilled") {
+      State.perfTrades = trades.value;
+      renderTradeHistory(trades.value);
+    }
+    if (kernels.status === "fulfilled") {
+      State.perfKernels = kernels.value;
+      renderKernelPerformance(kernels.value);
+    }
+  } catch (e) {
+    addLog("ERROR", `Performance fetch failed: ${e.message}`);
+  }
+}
+
+function renderPerfSummary(s) {
+  if (!s) return;
+
+  const totalPnlEl = $("#perf-total-pnl");
+  if (totalPnlEl) {
+    const v = Number(s.total_pnl || 0);
+    totalPnlEl.textContent = `$${fmt4(v)}`;
+    totalPnlEl.className = `val ${pnlClass(v)}`;
+  }
+
+  const winRateEl = $("#perf-win-rate");
+  if (winRateEl) {
+    const wr = s.win_rate != null ? (Number(s.win_rate) * 100).toFixed(1) + "%" : "—";
+    winRateEl.textContent = wr;
+    const numWr = Number(s.win_rate || 0);
+    winRateEl.className = `val ${numWr >= 0.5 ? "pos" : numWr > 0 ? "neu" : "neg"}`;
+  }
+
+  const totalTradesEl = $("#perf-total-trades");
+  if (totalTradesEl) totalTradesEl.textContent = s.total_trades != null ? String(s.total_trades) : "—";
+
+  const totalVolEl = $("#perf-total-volume");
+  if (totalVolEl) totalVolEl.textContent = s.total_volume != null ? `$${fmtK(s.total_volume)}` : "—";
+
+  const kernelCountEl = $("#perf-kernel-count");
+  if (kernelCountEl) kernelCountEl.textContent = s.kernel_count != null ? String(s.kernel_count) : "—";
+}
+
+function renderPnlChart(data) {
+  const canvas = $("#perf-pnl-chart");
+  if (!canvas) return;
+  if (!data || data.length === 0) return;
+
+  // Destroy existing chart instance to avoid canvas reuse errors
+  if (State.perfPnlChart) {
+    State.perfPnlChart.destroy();
+    State.perfPnlChart = null;
+  }
+
+  const labels = data.map(d => {
+    try {
+      const dt = new Date(d.ts);
+      return dt.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+    } catch { return d.ts || ""; }
+  });
+
+  const realizedData   = data.map(d => d.realized   != null ? Number(d.realized)   : null);
+  const unrealizedData = data.map(d => d.unrealized  != null ? Number(d.unrealized) : null);
+  const totalData      = data.map(d => d.total       != null ? Number(d.total)      : null);
+
+  const gridColor  = "rgba(30, 30, 53, 0.8)";
+  const labelColor = "#6666aa";
+
+  State.perfPnlChart = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Realized",
+          data: realizedData,
+          borderColor: "#00ff88",
+          backgroundColor: "rgba(0, 255, 136, 0.05)",
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          tension: 0.3,
+          fill: false,
+          spanGaps: true,
+        },
+        {
+          label: "Unrealized",
+          data: unrealizedData,
+          borderColor: "#ffcc00",
+          backgroundColor: "rgba(255, 204, 0, 0.05)",
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          tension: 0.3,
+          fill: false,
+          spanGaps: true,
+        },
+        {
+          label: "Total",
+          data: totalData,
+          borderColor: "#00ccff",
+          backgroundColor: "rgba(0, 204, 255, 0.08)",
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.3,
+          fill: false,
+          spanGaps: true,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          labels: {
+            color: labelColor,
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            boxWidth: 12,
+            padding: 16,
+          },
+        },
+        tooltip: {
+          backgroundColor: "#13131f",
+          borderColor: "#2a2a4a",
+          borderWidth: 1,
+          titleColor: "#8888aa",
+          bodyColor: "#e8e8f0",
+          titleFont: { family: "'JetBrains Mono', monospace", size: 10 },
+          bodyFont:  { family: "'JetBrains Mono', monospace", size: 11 },
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: $${fmt4(ctx.parsed.y)}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: labelColor,
+            font: { family: "'JetBrains Mono', monospace", size: 9 },
+            maxTicksLimit: 12,
+            maxRotation: 0,
+          },
+          grid: { color: gridColor },
+          border: { color: "#1e1e35" },
+        },
+        y: {
+          ticks: {
+            color: labelColor,
+            font: { family: "'JetBrains Mono', monospace", size: 9 },
+            callback: (v) => `$${fmt2(v)}`,
+          },
+          grid: { color: gridColor },
+          border: { color: "#1e1e35" },
+        },
+      },
+    },
+  });
+}
+
+function renderTradeHistory(trades) {
+  const tbody = document.querySelector("#tbl-perf-trades tbody");
+  if (!tbody) return;
+
+  if (!trades || trades.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="state-empty">No trades recorded</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = trades.slice(0, 200).map(t => {
+    const pnlCls = pnlClass(t.pnl);
+    const slipCls = t.slippage != null && Number(t.slippage) < 0 ? "text-red" : "text-secondary";
+    return `
+      <tr>
+        <td class="text-secondary">${escHtml(fmtTs(t.timestamp))}</td>
+        <td class="truncate text-secondary" title="${escHtml(t.kernel_name)}">${escHtml(t.kernel_name || "—")}</td>
+        <td>${sideBadge(t.side)}</td>
+        <td class="num">${fmt4(t.price)}</td>
+        <td class="num">${fmtK(t.size)}</td>
+        <td class="num ${pnlCls}">${t.pnl != null ? `$${fmt4(t.pnl)}` : "—"}</td>
+        <td class="num ${slipCls}">${t.slippage != null ? fmt4(t.slippage) : "—"}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function renderKernelPerformance(kernels) {
+  const container = $("#perf-kernel-cards");
+  if (!container) return;
+
+  if (!kernels || kernels.length === 0) {
+    container.innerHTML = `<div class="state-empty">No kernel data</div>`;
+    return;
+  }
+
+  container.innerHTML = kernels.map(k => {
+    const pnlVal  = Number(k.total_pnl || 0);
+    const cardCls = pnlVal > 0 ? "profitable" : pnlVal < 0 ? "losing" : "neutral";
+    const pnlCls  = pnlClass(pnlVal);
+    const wr      = k.win_rate != null ? (Number(k.win_rate) * 100).toFixed(1) + "%" : "—";
+    return `
+      <div class="kernel-perf-card ${cardCls}">
+        <div class="kernel-perf-name">
+          <span>${escHtml(k.name)}</span>
+          <span class="kernel-perf-pnl ${pnlCls}">$${fmt4(pnlVal)}</span>
+        </div>
+        <div class="kernel-perf-grid">
+          <span class="kernel-perf-item"><span class="k">trades </span>${k.trade_count != null ? k.trade_count : "—"}</span>
+          <span class="kernel-perf-item"><span class="k">win rate </span>${wr}</span>
+          <span class="kernel-perf-item"><span class="k">wins </span>${k.win_count != null ? k.win_count : "—"}</span>
+          <span class="kernel-perf-item"><span class="k">losses </span>${k.loss_count != null ? k.loss_count : "—"}</span>
+          <span class="kernel-perf-item"><span class="k">volume </span>$${fmtK(k.total_volume)}</span>
+          <span class="kernel-perf-item"><span class="k">avg slip </span>${k.avg_slippage != null ? fmt4(k.avg_slippage) : "—"}</span>
+        </div>
+        <hr class="kernel-perf-divider" />
+        <div class="kernel-perf-extremes">
+          <span class="kernel-perf-extreme text-green"><span class="k">best  </span>${k.best_trade != null ? `$${fmt4(k.best_trade)}` : "—"}</span>
+          <span class="kernel-perf-extreme text-red"><span class="k">worst </span>${k.worst_trade != null ? `$${fmt4(k.worst_trade)}` : "—"}</span>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+// ------------------------------------------------------------------ //
+// Risk Tab                                                             //
+// ------------------------------------------------------------------ //
+async function refreshRisk() {
+  try {
+    const [summary, positions] = await Promise.allSettled([
+      apiFetch("/api/risk/summary"),
+      apiFetch("/api/risk/positions"),
+    ]);
+
+    if (summary.status === "fulfilled") {
+      State.riskSummary = summary.value;
+      renderRiskSummary(summary.value);
+    }
+    if (positions.status === "fulfilled") {
+      State.riskPositions = positions.value;
+      renderRiskPositions(positions.value);
+    }
+  } catch (e) {
+    addLog("ERROR", `Risk fetch failed: ${e.message}`);
+  }
+}
+
+function renderRiskSummary(s) {
+  if (!s) return;
+
+  const grossEl = $("#risk-gross-exposure");
+  if (grossEl) grossEl.textContent = s.gross_exposure != null ? `$${fmtK(s.gross_exposure)}` : "—";
+
+  const posCountEl = $("#risk-position-count");
+  if (posCountEl) posCountEl.textContent = s.position_count != null ? String(s.position_count) : "—";
+
+  const unrEl = $("#risk-unrealized-pnl");
+  if (unrEl) {
+    const v = Number(s.unrealized_pnl || 0);
+    unrEl.textContent = `$${fmt4(v)}`;
+    unrEl.className = `val ${pnlClass(v)}`;
+  }
+
+  const largestEl = $("#risk-largest-position");
+  if (largestEl) {
+    if (s.largest_position && s.largest_position.token_id) {
+      const lp = s.largest_position;
+      largestEl.textContent = `${lp.token_id.substring(0, 12)}… $${fmtK(Math.abs(lp.unrealized_pnl || lp.cost_basis || 0))}`;
+    } else {
+      largestEl.textContent = "—";
+    }
+  }
+
+  // P&L breakdown cells
+  const realEl = $("#risk-realized-pnl");
+  if (realEl) {
+    const v = Number(s.realized_pnl || 0);
+    realEl.textContent = `$${fmt4(v)}`;
+    realEl.className = `val ${pnlClass(v)}`;
+  }
+
+  const unrEl2 = $("#risk-unrealized-pnl-2");
+  if (unrEl2) {
+    const v = Number(s.unrealized_pnl || 0);
+    unrEl2.textContent = `$${fmt4(v)}`;
+    unrEl2.className = `val ${pnlClass(v)}`;
+  }
+
+  const totalEl = $("#risk-total-pnl");
+  if (totalEl) {
+    const v = Number(s.total_pnl || 0);
+    totalEl.textContent = `$${fmt4(v)}`;
+    totalEl.className = `val ${pnlClass(v)}`;
+  }
+
+  const tradeCountEl = $("#risk-trade-count");
+  if (tradeCountEl) tradeCountEl.textContent = s.trade_count != null ? String(s.trade_count) : "—";
+}
+
+function renderRiskPositions(positions) {
+  const tbody = document.querySelector("#tbl-risk-positions tbody");
+  if (!tbody) return;
+
+  if (!positions || positions.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="state-empty">No open positions</div></td></tr>`;
+    return;
+  }
+
+  // Find max weight for bar scaling
+  const maxWeight = Math.max(...positions.map(p => Math.abs(Number(p.weight || 0))), 0.0001);
+
+  tbody.innerHTML = positions.map(p => {
+    const pnlCls   = pnlClass(p.unrealized_pnl);
+    const weight   = p.weight != null ? Number(p.weight) : 0;
+    const weightPct = (weight * 100).toFixed(1);
+    const barWidth  = Math.min(100, (Math.abs(weight) / maxWeight) * 100).toFixed(1);
+    const barColor  = weight >= 0 ? "var(--cyan)" : "var(--yellow)";
+    const tokenShort = p.token_id ? p.token_id.substring(0, 12) + "…" : "—";
+    const marketShort = p.market_id ? p.market_id.substring(0, 10) + "…" : "—";
+    return `
+      <tr>
+        <td class="mono truncate" title="${escHtml(p.token_id)}">${escHtml(tokenShort)}</td>
+        <td class="truncate text-secondary" title="${escHtml(p.market_id)}">${escHtml(marketShort)}</td>
+        <td>${sideBadge(p.side)}</td>
+        <td class="num">${fmtK(p.size)}</td>
+        <td class="num">${fmt4(p.avg_entry_price)}</td>
+        <td class="num">${p.current_price != null ? fmt4(p.current_price) : "—"}</td>
+        <td class="num text-secondary">$${fmt4(p.cost_basis)}</td>
+        <td class="num text-secondary">$${fmt4(p.market_value)}</td>
+        <td class="num ${pnlCls}">${p.unrealized_pnl != null ? `$${fmt4(p.unrealized_pnl)}` : "—"}</td>
+        <td class="num">
+          <div class="weight-cell">
+            <span>${weightPct}%</span>
+            <div class="weight-bar-wrap">
+              <div class="weight-bar" style="width:${barWidth}%; background:${barColor};"></div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+// ------------------------------------------------------------------ //
 // Navigation tabs                                                       //
 // ------------------------------------------------------------------ //
 function bindNavTabs() {
@@ -813,11 +1188,39 @@ function bindNavTabs() {
       const tab = document.getElementById(`tab-${btn.dataset.tab}`);
       if (tab) {
         tab.classList.add("active");
-        if (btn.dataset.tab === "logs") renderLogsTab();
-        if (btn.dataset.tab === "settings") loadSettingsFromStorage();
+        if (btn.dataset.tab === "logs")        renderLogsTab();
+        if (btn.dataset.tab === "settings")    loadSettingsFromStorage();
+        if (btn.dataset.tab === "performance") {
+          refreshPerformance();
+          startPerfPolling();
+        }
+        if (btn.dataset.tab === "risk")        refreshRisk();
       }
+
+      // Stop performance polling when leaving the performance tab
+      if (btn.dataset.tab !== "performance") stopPerfPolling();
     });
   });
+}
+
+function startPerfPolling() {
+  stopPerfPolling();
+  State.perfRefreshTimer = setInterval(() => {
+    // Only refresh if the performance tab is still active
+    const perfTab = document.getElementById("tab-performance");
+    if (perfTab && perfTab.classList.contains("active")) {
+      refreshPerformance();
+    } else {
+      stopPerfPolling();
+    }
+  }, 5000);
+}
+
+function stopPerfPolling() {
+  if (State.perfRefreshTimer) {
+    clearInterval(State.perfRefreshTimer);
+    State.perfRefreshTimer = null;
+  }
 }
 
 // ------------------------------------------------------------------ //

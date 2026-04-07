@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>POLYSTATION — Trading Terminal</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- Chart.js for Performance tab P&L chart -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <!-- JetBrains Mono from Google Fonts for the terminal look -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -59,6 +61,8 @@
     <button class="nav-tab active" data-tab="trading">Trading</button>
     <button class="nav-tab" data-tab="logs">Logs</button>
     <button class="nav-tab" data-tab="settings">Settings</button>
+    <button class="nav-tab" data-tab="performance">Performance</button>
+    <button class="nav-tab" data-tab="risk">Risk</button>
   </nav>
 
   <!-- ============================================================
@@ -448,6 +452,206 @@
     </div><!-- /#settings-scroll -->
 
   </div><!-- /#tab-settings -->
+
+  <!-- ============================================================
+       PERFORMANCE TAB
+       ============================================================ -->
+  <div id="tab-performance" class="tab-content">
+
+    <!-- Summary stats bar -->
+    <div class="perf-stats-bar">
+      <div class="perf-stat-cell">
+        <div class="lbl">Total P&amp;L</div>
+        <div id="perf-total-pnl" class="val neu">$0.0000</div>
+      </div>
+      <div class="perf-stat-cell">
+        <div class="lbl">Win Rate</div>
+        <div id="perf-win-rate" class="val">—</div>
+      </div>
+      <div class="perf-stat-cell">
+        <div class="lbl">Total Trades</div>
+        <div id="perf-total-trades" class="val">—</div>
+      </div>
+      <div class="perf-stat-cell">
+        <div class="lbl">Total Volume</div>
+        <div id="perf-total-volume" class="val">—</div>
+      </div>
+      <div class="perf-stat-cell">
+        <div class="lbl">Active Kernels</div>
+        <div id="perf-kernel-count" class="val">—</div>
+      </div>
+    </div>
+
+    <!-- P&L chart -->
+    <div class="perf-chart-container">
+      <canvas id="perf-pnl-chart"></canvas>
+    </div>
+
+    <!-- Trade history + kernel performance cards -->
+    <div class="perf-content">
+
+      <!-- Trade history table -->
+      <div class="perf-trades">
+        <div class="panel-header">
+          <span class="panel-title">Trade History</span>
+          <div class="panel-actions">
+            <button class="btn btn-sm" onclick="refreshPerformance()" title="Refresh">&#8635;</button>
+          </div>
+        </div>
+        <div class="panel-content">
+          <table class="data-table" id="tbl-perf-trades">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Kernel</th>
+                <th>Side</th>
+                <th class="text-right">Price</th>
+                <th class="text-right">Size</th>
+                <th class="text-right">P&amp;L</th>
+                <th class="text-right">Slippage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="7">
+                  <div class="state-loading"><div class="spinner"></div> Loading trades…</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Per-kernel performance cards -->
+      <div class="perf-kernels">
+        <div style="font-size:9px; color:var(--text-label); letter-spacing:2px; text-transform:uppercase; padding:4px 2px 8px; flex-shrink:0;">Kernel Performance</div>
+        <div id="perf-kernel-cards">
+          <div class="state-loading"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+
+    </div><!-- /.perf-content -->
+
+  </div><!-- /#tab-performance -->
+
+  <!-- ============================================================
+       RISK TAB
+       ============================================================ -->
+  <div id="tab-risk" class="tab-content">
+
+    <!-- Risk summary stats bar -->
+    <div class="risk-stats-bar">
+      <div class="perf-stat-cell">
+        <div class="lbl">Gross Exposure</div>
+        <div id="risk-gross-exposure" class="val">—</div>
+      </div>
+      <div class="perf-stat-cell">
+        <div class="lbl">Positions</div>
+        <div id="risk-position-count" class="val">—</div>
+      </div>
+      <div class="perf-stat-cell">
+        <div class="lbl">Unrealized P&amp;L</div>
+        <div id="risk-unrealized-pnl" class="val neu">$0.0000</div>
+      </div>
+      <div class="perf-stat-cell">
+        <div class="lbl">Largest Position</div>
+        <div id="risk-largest-position" class="val text-secondary">—</div>
+      </div>
+    </div>
+
+    <!-- Two-column layout: RiskGuard panel + P&L breakdown -->
+    <div class="risk-top-row">
+
+      <!-- RiskGuard status panel -->
+      <div class="risk-guard-panel">
+        <div class="risk-guard-header">
+          <span class="risk-guard-title">RiskGuard</span>
+          <span class="risk-guard-badge badge-neutral">Not Configured</span>
+        </div>
+        <div class="risk-guard-body">
+          <div class="risk-guard-row">
+            <span class="risk-guard-lbl">Max Daily Loss</span>
+            <span class="risk-guard-val text-muted">—</span>
+          </div>
+          <div class="risk-guard-row">
+            <span class="risk-guard-lbl">Max Gross Exposure</span>
+            <span class="risk-guard-val text-muted">—</span>
+          </div>
+          <div class="risk-guard-row">
+            <span class="risk-guard-lbl">Max Position Size</span>
+            <span class="risk-guard-val text-muted">—</span>
+          </div>
+          <div class="risk-guard-row">
+            <span class="risk-guard-lbl">Kill Switch</span>
+            <span class="risk-guard-val text-muted">Inactive</span>
+          </div>
+          <div class="risk-guard-note">RiskGuard will be configured in a future release.</div>
+        </div>
+      </div>
+
+      <!-- P&L breakdown -->
+      <div class="risk-pnl-panel">
+        <div class="risk-guard-header">
+          <span class="risk-guard-title">P&amp;L Breakdown</span>
+        </div>
+        <div class="risk-pnl-grid">
+          <div class="risk-pnl-cell">
+            <div class="lbl">Realized P&amp;L</div>
+            <div id="risk-realized-pnl" class="val neu">$0.0000</div>
+          </div>
+          <div class="risk-pnl-cell">
+            <div class="lbl">Unrealized P&amp;L</div>
+            <div id="risk-unrealized-pnl-2" class="val neu">$0.0000</div>
+          </div>
+          <div class="risk-pnl-cell">
+            <div class="lbl">Total P&amp;L</div>
+            <div id="risk-total-pnl" class="val neu">$0.0000</div>
+          </div>
+          <div class="risk-pnl-cell">
+            <div class="lbl">Trade Count</div>
+            <div id="risk-trade-count" class="val">—</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.risk-top-row -->
+
+    <!-- Positions table -->
+    <div class="risk-positions">
+      <div class="panel-header">
+        <span class="panel-title">Open Positions — Risk View</span>
+        <div class="panel-actions">
+          <button class="btn btn-sm" onclick="refreshRisk()" title="Refresh">&#8635;</button>
+        </div>
+      </div>
+      <div class="panel-content">
+        <table class="data-table" id="tbl-risk-positions">
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th>Market</th>
+              <th>Side</th>
+              <th class="text-right">Size</th>
+              <th class="text-right">Entry</th>
+              <th class="text-right">Current</th>
+              <th class="text-right">Cost Basis</th>
+              <th class="text-right">Mkt Value</th>
+              <th class="text-right">Unr. P&amp;L</th>
+              <th class="text-right">Weight %</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="10">
+                <div class="state-empty">No open positions</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /#tab-risk -->
 
 </div><!-- /#app -->
 

@@ -32,6 +32,7 @@ class TradingEngine:
         self.market_data: Any = None
         self.portfolio: Any = None
         self.execution: Any = None
+        self.metrics: Any = None
 
     def register_kernel(self, kernel: Kernel) -> None:
         """Register a kernel with the engine. Does not start it."""

@@ -1066,3 +1066,371 @@ body.resizing-row .gutter-horizontal {
   transform: translateX(18px);
   background: var(--green);
 }
+
+/* ================================================================
+   PERFORMANCE TAB
+   ================================================================ */
+
+/* ---- Performance tab layout ---------------------------------- */
+#tab-performance.active {
+  display: flex !important;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---- Stats bar (5 columns) ----------------------------------- */
+.perf-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.perf-stat-cell {
+  background: var(--bg-panel-alt);
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.perf-stat-cell .lbl {
+  font-size: 9px;
+  color: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.perf-stat-cell .val {
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+/* ---- P&L Chart container ------------------------------------- */
+.perf-chart-container {
+  padding: 12px 16px;
+  flex-shrink: 0;
+  height: 240px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.perf-chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ---- Trade history + kernel cards row ------------------------ */
+.perf-content {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 1px;
+  background: var(--border);
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.perf-trades {
+  background: var(--bg-panel);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.perf-kernels {
+  background: var(--bg-panel);
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ---- Kernel performance cards -------------------------------- */
+.kernel-perf-card {
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  flex-shrink: 0;
+  transition: border-color 0.2s;
+}
+
+.kernel-perf-card:hover { border-color: var(--border-bright); }
+.kernel-perf-card.profitable { border-left: 3px solid var(--green); }
+.kernel-perf-card.losing     { border-left: 3px solid var(--red); }
+.kernel-perf-card.neutral    { border-left: 3px solid var(--text-muted); }
+
+.kernel-perf-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kernel-perf-pnl {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.kernel-perf-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 8px;
+}
+
+.kernel-perf-item {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.kernel-perf-item .k { color: var(--text-label); }
+
+.kernel-perf-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 6px 0;
+}
+
+.kernel-perf-extremes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 8px;
+  margin-top: 2px;
+}
+
+.kernel-perf-extreme {
+  font-size: 10px;
+}
+
+.kernel-perf-extreme .k { color: var(--text-label); }
+
+/* ---- Trade history table column widths ----------------------- */
+#tbl-perf-trades { table-layout: auto; }
+#tbl-perf-trades th:nth-child(1) { width: 80px; }
+#tbl-perf-trades th:nth-child(2) { width: 100px; }
+#tbl-perf-trades th:nth-child(3) { width: 48px; }
+#tbl-perf-trades th:nth-child(4) { width: 60px; }
+#tbl-perf-trades th:nth-child(5) { width: 60px; }
+#tbl-perf-trades th:nth-child(6) { width: 72px; }
+#tbl-perf-trades th:nth-child(7) { width: 72px; }
+
+/* ================================================================
+   RISK TAB
+   ================================================================ */
+
+/* ---- Risk tab layout ----------------------------------------- */
+#tab-risk.active {
+  display: flex !important;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---- Risk stats bar (4 columns) ------------------------------ */
+.risk-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ---- Top row: RiskGuard + P&L breakdown ---------------------- */
+.risk-top-row {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 1px;
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ---- RiskGuard status panel ---------------------------------- */
+.risk-guard-panel {
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.risk-guard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-header);
+  flex-shrink: 0;
+}
+
+.risk-guard-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-label);
+}
+
+.risk-guard-badge {
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.risk-guard-badge.badge-neutral {
+  background: rgba(100, 100, 150, 0.2);
+  color: var(--text-muted);
+}
+
+.risk-guard-badge.badge-ok {
+  background: var(--green-glow);
+  color: var(--green);
+}
+
+.risk-guard-badge.badge-warning {
+  background: rgba(255, 204, 0, 0.15);
+  color: var(--yellow);
+}
+
+.risk-guard-badge.badge-breach {
+  background: var(--red-glow);
+  color: var(--red);
+}
+
+.risk-guard-body {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.risk-guard-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(30, 30, 53, 0.5);
+}
+
+.risk-guard-lbl {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.risk-guard-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.risk-guard-note {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+}
+
+/* ---- P&L breakdown panel ------------------------------------- */
+.risk-pnl-panel {
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.risk-pnl-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border);
+  flex: 1;
+}
+
+.risk-pnl-cell {
+  background: var(--bg-panel-alt);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.risk-pnl-cell .lbl {
+  font-size: 9px;
+  color: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.risk-pnl-cell .val {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* ---- Risk positions table ------------------------------------ */
+.risk-positions {
+  background: var(--bg-panel);
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#tbl-risk-positions { table-layout: auto; }
+#tbl-risk-positions th:nth-child(1) { width: 100px; }
+#tbl-risk-positions th:nth-child(2) { width: 80px; }
+#tbl-risk-positions th:nth-child(3) { width: 48px; }
+#tbl-risk-positions th:nth-child(4) { width: 64px; }
+#tbl-risk-positions th:nth-child(5) { width: 64px; }
+#tbl-risk-positions th:nth-child(6) { width: 64px; }
+#tbl-risk-positions th:nth-child(7) { width: 80px; }
+#tbl-risk-positions th:nth-child(8) { width: 80px; }
+#tbl-risk-positions th:nth-child(9) { width: 72px; }
+#tbl-risk-positions th:nth-child(10) { width: 64px; }
+
+/* Weight bar inside risk table cells */
+.weight-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.weight-bar-wrap {
+  width: 40px;
+  height: 4px;
+  background: var(--border-bright);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.weight-bar {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--cyan);
+  transition: width 0.3s ease;
+}
+
+/* ================================================================
+   RESPONSIVE (Performance & Risk tabs)
+   ================================================================ */
+@media (max-width: 1100px) {
+  .perf-stats-bar { grid-template-columns: repeat(5, 1fr); }
+  .risk-stats-bar { grid-template-columns: repeat(2, 1fr); }
+  .risk-top-row   { grid-template-columns: 1fr; }
+  .risk-pnl-grid  { grid-template-columns: repeat(2, 1fr); }
+  .perf-content   { grid-template-columns: 1fr; }
+  .perf-kernels   { display: none; }
+}

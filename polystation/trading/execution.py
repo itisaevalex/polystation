@@ -26,10 +26,12 @@ class ExecutionEngine:
         clob_client: ClobClient,
         order_manager: OrderManager,
         portfolio: Portfolio,
+        metrics: Any = None,
     ) -> None:
         self.client = clob_client
         self.orders = order_manager
         self.portfolio = portfolio
+        self.metrics = metrics
         self._dry_run: bool = False   # Set True to skip actual submission
 
     def set_dry_run(self, enabled: bool) -> None:
@@ -68,6 +70,7 @@ class ExecutionEngine:
                 order.size,
                 order.price,
             )
+            prev_realized = self.portfolio.realized_pnl
             self.orders.update_status(order.id, OrderStatus.FILLED)
             self.orders.record_fill(order.id, order.price, order.size)
             self.portfolio.record_fill(
@@ -77,6 +80,18 @@ class ExecutionEngine:
                 order.size,
                 market_id=order.market_id,
             )
+            fill_realized = self.portfolio.realized_pnl - prev_realized
+            if self.metrics:
+                self.metrics.record_fill(
+                    order_id=order.id,
+                    token_id=order.token_id,
+                    side=order.side,
+                    order_price=order.price,
+                    fill_price=order.price,
+                    fill_size=order.size,
+                    kernel_name=order.kernel_name,
+                    realized_pnl=fill_realized,
+                )
             return {"dry_run": True, "order_id": order.id}
 
         try:
@@ -100,6 +115,7 @@ class ExecutionEngine:
                 # Treat CLOB acceptance as an immediate fill.
                 # A production implementation would await fill confirmation
                 # via WebSocket or polling before booking the portfolio entry.
+                prev_realized = self.portfolio.realized_pnl
                 self.orders.record_fill(order.id, order.price, order.size)
                 self.portfolio.record_fill(
                     order.token_id,
@@ -108,6 +124,18 @@ class ExecutionEngine:
                     order.size,
                     market_id=order.market_id,
                 )
+                fill_realized = self.portfolio.realized_pnl - prev_realized
+                if self.metrics:
+                    self.metrics.record_fill(
+                        order_id=order.id,
+                        token_id=order.token_id,
+                        side=order.side,
+                        order_price=order.price,
+                        fill_price=order.price,
+                        fill_size=order.size,
+                        kernel_name=order.kernel_name,
+                        realized_pnl=fill_realized,
+                    )
                 logger.info(
                     "Order %s submitted and filled: %s", order.id, server_id
                 )
