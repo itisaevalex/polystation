@@ -32,12 +32,14 @@ class ExecutionEngine:
         portfolio: Portfolio,
         metrics: Any = None,
         risk_guard: Any = None,
+        redis_client: Any = None,
     ) -> None:
         self.client = clob_client
         self.orders = order_manager
         self.portfolio = portfolio
         self.metrics = metrics
         self.risk_guard = risk_guard
+        self.redis = redis_client
         self._dry_run: bool = False   # Set True to skip actual submission
 
     def set_dry_run(self, enabled: bool) -> None:
@@ -106,6 +108,18 @@ class ExecutionEngine:
                 )
             if self.risk_guard and fill_realized < 0:
                 self.risk_guard.record_loss(fill_realized)
+            if self.redis:
+                self.redis.publish_trade(
+                    {
+                        "order_id": order.id,
+                        "token_id": order.token_id,
+                        "side": order.side,
+                        "price": order.price,
+                        "size": order.size,
+                        "kernel": order.kernel_name,
+                        "dry_run": True,
+                    }
+                )
             return {"dry_run": True, "order_id": order.id}
 
         try:
@@ -152,6 +166,18 @@ class ExecutionEngine:
                     )
                 if self.risk_guard and fill_realized < 0:
                     self.risk_guard.record_loss(fill_realized)
+                if self.redis:
+                    self.redis.publish_trade(
+                        {
+                            "order_id": order.id,
+                            "server_order_id": server_id,
+                            "token_id": order.token_id,
+                            "side": order.side,
+                            "price": order.price,
+                            "size": order.size,
+                            "kernel": order.kernel_name,
+                        }
+                    )
                 logger.info(
                     "Order %s submitted and filled: %s", order.id, server_id
                 )

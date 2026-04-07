@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from polystation.core.orders import OrderManager
 from polystation.core.portfolio import Portfolio
 from polystation.core.prometheus import PolystationMetrics
 from polystation.core.risk import RiskGuard
+from polystation.infra.redis_client import RedisManager
 from polystation.market.client import MarketDataClient
 from polystation.trading.execution import ExecutionEngine
 
@@ -28,6 +30,29 @@ def get_engine() -> TradingEngine:
     """Return the global TradingEngine, raising AssertionError if not yet initialised."""
     assert engine is not None, "Engine not initialized"
     return engine
+
+
+async def _redis_heartbeat_loop(rm: RedisManager) -> None:
+    """Background task that sends a Redis heartbeat every 10 seconds.
+
+    Args:
+        rm: Connected RedisManager instance.
+    """
+    while True:
+        rm.heartbeat()
+        await asyncio.sleep(10)
+
+
+async def _redis_snapshot_loop(eng: TradingEngine) -> None:
+    """Background task that snapshots portfolio state to Redis every 5 seconds.
+
+    Args:
+        eng: TradingEngine whose portfolio state is snapshotted.
+    """
+    while True:
+        if eng.redis and eng.redis.connected and eng.portfolio:
+            eng.redis.snapshot_portfolio(eng.portfolio.get_summary())
+        await asyncio.sleep(5)
 
 
 async def _prometheus_scrape_loop(eng: TradingEngine, interval: float = 5.0) -> None:
@@ -63,20 +88,38 @@ async def lifespan(app: FastAPI):
     # Pre-trade risk guard
     risk_guard = RiskGuard()
 
+    # Optional Redis integration — gracefully no-ops when unavailable
+    redis_url = os.getenv("REDIS_URL", "")
+    if redis_url:
+        engine.redis = RedisManager(redis_url)
+    else:
+        engine.redis = RedisManager()  # will try localhost, fail gracefully
+
     # ExecutionEngine requires a ClobClient for live trading; pass None for
     # dashboard-only / dry-run mode where no signed orders are submitted.
     engine.execution = ExecutionEngine(  # type: ignore[arg-type]
-        None, engine.orders, engine.portfolio, metrics=engine.metrics, risk_guard=risk_guard
+        None,
+        engine.orders,
+        engine.portfolio,
+        metrics=engine.metrics,
+        risk_guard=risk_guard,
+        redis_client=engine.redis,
     )
     engine.execution.set_dry_run(True)  # Safe default — no live CLOB calls
     await engine.start()
     snapshot_task = asyncio.create_task(engine.metrics.run_snapshots())
     prom_task = asyncio.create_task(_prometheus_scrape_loop(engine))
+    redis_hb_task = asyncio.create_task(_redis_heartbeat_loop(engine.redis))
+    redis_snap_task = asyncio.create_task(_redis_snapshot_loop(engine))
     logger.info("Polystation dashboard started")
     yield
     engine.metrics.stop()
     snapshot_task.cancel()
     prom_task.cancel()
+    redis_hb_task.cancel()
+    redis_snap_task.cancel()
+    if engine.redis and engine.redis.connected:
+        engine.redis.close()
     await engine.stop()
     logger.info("Polystation dashboard stopped")
 
