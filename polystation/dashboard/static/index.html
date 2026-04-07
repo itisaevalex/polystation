@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POLYSTATION — Trading Terminal</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- JetBrains Mono from Google Fonts for the terminal look -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================================================
+       HEADER
+       ============================================================ -->
+  <header id="header">
+    <div id="header-logo">POLYSTATION<span>v3</span></div>
+
+    <div class="header-divider"></div>
+
+    <div class="header-stat">
+      <span class="lbl">CLOB API</span>
+      <span id="header-clob-status" class="val text-muted">—</span>
+    </div>
+
+    <div class="header-divider"></div>
+
+    <div class="header-stat">
+      <span class="lbl">SERVER TIME</span>
+      <span id="header-server-time" class="val text-secondary">—</span>
+    </div>
+
+    <div class="header-divider"></div>
+
+    <div class="header-stat">
+      <span class="lbl">TRADES</span>
+      <span id="portfolio-trade-count" class="val">0</span>
+    </div>
+
+    <div class="header-divider"></div>
+
+    <div id="dry-run-badge">DRY RUN</div>
+
+    <div id="header-spacer"></div>
+
+    <div id="conn-status">
+      <div id="conn-dot"></div>
+      <span id="conn-label">OFFLINE</span>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       MAIN GRID
+       ============================================================ -->
+  <div id="main">
+
+    <!-- ==================== MARKETS ==================== -->
+    <div class="panel" id="panel-markets">
+      <div class="panel-header">
+        <span class="panel-title">Markets</span>
+        <div class="panel-actions">
+          <span id="markets-count" class="panel-badge">—</span>
+        </div>
+      </div>
+
+      <!-- Tabs: Active / Trending -->
+      <div id="markets-tabs">
+        <button class="markets-tab active" data-tab="active">Active</button>
+        <button class="markets-tab" data-tab="trending">Trending</button>
+      </div>
+
+      <!-- Search box -->
+      <div id="markets-search-wrap">
+        <input
+          type="text"
+          id="markets-search"
+          placeholder="Filter markets…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+
+      <!-- Markets table -->
+      <div class="panel-content">
+        <table class="data-table" id="tbl-markets">
+          <thead>
+            <tr>
+              <th>Question</th>
+              <th class="text-right">Bid</th>
+              <th class="text-right">Ask</th>
+              <th class="text-right">Volume</th>
+              <th class="text-right">Last</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="5">
+                <div class="state-loading"><div class="spinner"></div> Loading markets…</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ==================== ORDER BOOK ==================== -->
+    <div class="panel" id="panel-orderbook">
+      <div class="panel-header">
+        <span class="panel-title">Order Book</span>
+        <div class="panel-actions">
+          <button class="btn btn-sm" onclick="refreshOrderBook()" title="Refresh order book">&#8635;</button>
+        </div>
+      </div>
+
+      <!-- Market question + outcome token tabs -->
+      <div style="padding: 5px 12px; border-bottom: 1px solid var(--border); background: var(--bg-panel-alt); flex-shrink: 0;">
+        <div id="ob-market-question" class="truncate text-secondary" style="font-size:11px; margin-bottom:4px;">
+          Select a market from the left panel
+        </div>
+        <div id="ob-token-tabs" style="display:flex; gap:4px;"></div>
+      </div>
+
+      <!-- Pricing summary bar -->
+      <div id="ob-header-info">
+        <div class="ob-stat">
+          <span class="lbl">MID</span>
+          <span class="val text-primary" id="ob-midpoint">—</span>
+        </div>
+        <div class="ob-stat">
+          <span class="lbl">BID</span>
+          <span class="val text-green" id="ob-best-bid">—</span>
+        </div>
+        <div class="ob-stat">
+          <span class="lbl">ASK</span>
+          <span class="val text-red" id="ob-best-ask">—</span>
+        </div>
+        <div class="ob-stat">
+          <span class="lbl">SPREAD</span>
+          <span class="val text-secondary" id="ob-spread">—</span>
+        </div>
+      </div>
+
+      <!-- Bid / Ask columns -->
+      <div id="ob-content">
+        <div class="ob-side ob-bids">
+          <div class="ob-side-header bids-header">
+            <span>BIDS</span><span>SIZE</span>
+          </div>
+          <div id="ob-bids">
+            <div class="state-empty">No data</div>
+          </div>
+        </div>
+        <div class="ob-side ob-asks">
+          <div class="ob-side-header asks-header">
+            <span>ASKS</span><span>SIZE</span>
+          </div>
+          <div id="ob-asks">
+            <div class="state-empty">No data</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== STRATEGIES ==================== -->
+    <div class="panel" id="panel-strategies">
+      <div class="panel-header">
+        <span class="panel-title">Strategies</span>
+        <div class="panel-actions">
+          <button class="btn btn-sm" onclick="refreshStrategies()" title="Refresh strategies">&#8635;</button>
+        </div>
+      </div>
+
+      <div class="panel-content">
+        <div id="strategies-list">
+          <div class="state-loading"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+
+      <!-- Start kernel form -->
+      <div id="start-kernel-form">
+        <div style="font-size:9px; color:var(--text-label); letter-spacing:1px; margin-bottom:6px; text-transform:uppercase;">Start Kernel</div>
+        <div class="form-row">
+          <select id="kernel-select" class="form-select">
+            <option value="">Loading…</option>
+          </select>
+          <button id="btn-start-kernel" class="btn btn-green btn-sm">START</button>
+        </div>
+        <div class="form-row" style="margin-top:4px;">
+          <input
+            type="text"
+            id="kernel-token-id"
+            class="form-input"
+            placeholder="token_id (required for mm/signal)"
+            style="flex:1;"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== ORDERS ==================== -->
+    <div class="panel" id="panel-orders">
+      <div class="panel-header">
+        <span class="panel-title">Orders</span>
+        <div class="panel-actions">
+          <span id="orders-active-count" class="panel-badge">—</span>
+          <button class="btn btn-sm" onclick="refreshOrders()" title="Refresh orders">&#8635;</button>
+        </div>
+      </div>
+
+      <div class="panel-content">
+        <table class="data-table" id="tbl-orders">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Side</th>
+              <th class="text-right">Price</th>
+              <th class="text-right">Size</th>
+              <th>Status</th>
+              <th>Kernel</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="6">
+                <div class="state-loading"><div class="spinner"></div> Loading orders…</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ==================== PORTFOLIO ==================== -->
+    <div class="panel" id="panel-portfolio">
+      <div class="panel-header">
+        <span class="panel-title">Portfolio</span>
+        <div class="panel-actions">
+          <button class="btn btn-sm" onclick="refreshPortfolio()" title="Refresh portfolio">&#8635;</button>
+        </div>
+      </div>
+
+      <!-- P&L Summary bar -->
+      <div id="pnl-summary">
+        <div class="pnl-cell">
+          <div class="lbl">Realized P&L</div>
+          <div id="pnl-realized" class="val neu">$0.0000</div>
+        </div>
+        <div class="pnl-cell">
+          <div class="lbl">Unrealized P&L</div>
+          <div id="pnl-unrealized" class="val neu">$0.0000</div>
+        </div>
+        <div class="pnl-cell">
+          <div class="lbl">Total P&L</div>
+          <div id="pnl-total" class="val neu">$0.0000</div>
+        </div>
+      </div>
+
+      <!-- Positions table -->
+      <div class="panel-content">
+        <table class="data-table" id="tbl-portfolio">
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th>Side</th>
+              <th class="text-right">Entry</th>
+              <th class="text-right">Current</th>
+              <th class="text-right">Size</th>
+              <th class="text-right">Unr. P&L</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="6">
+                <div class="state-empty">No open positions</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /#main -->
+
+  <!-- ============================================================
+       TRADE LOG (bottom bar)
+       ============================================================ -->
+  <div id="trade-log">
+    <div id="trade-log-header">
+      <span id="trade-log-title">Trade Log</span>
+      <button id="btn-clear-log" class="btn btn-sm">Clear</button>
+    </div>
+    <div id="trade-log-entries"></div>
+  </div>
+
+</div><!-- /#app -->
+
+<script src="app.js"></script>
+</body>
+</html>
