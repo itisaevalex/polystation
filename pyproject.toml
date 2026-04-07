@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "polystation"
+version = "3.0.0"
+description = "Full Polymarket trading station — pluggable strategy kernels, live dashboard, market data, order execution."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "itisaevalex" },
+]
+dependencies = [
+    "py-clob-client>=0.18.0",
+    "web3>=7.6,<8",
+    "bip-utils>=2.9,<3",
+    "python-dotenv>=1.0",
+    "vosk>=0.3.45",
+    "yt-dlp>=2024.1",
+    "m3u8>=3.5",
+    "requests>=2.31",
+    "backoff>=2.2",
+    "pyyaml>=6.0",
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.20",
+    "aiohttp>=3.9",
+    "websockets>=12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+notebook = [
+    "jupyter>=1.0",
+    "numpy>=1.26",
+    "pandas>=2.1",
+]
+
+[project.scripts]
+polystation = "polystation.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["polystation"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "TCH"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["polystation"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+asyncio_mode = "auto"

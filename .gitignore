@@ -1,5 +1,42 @@
-__pycache__
-venv
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment and secrets
 .env
-.vscode
-vosk-model-small-en-us-0.15/
+*.env.save
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Vosk models
+vosk-model-*/
+
+# Application data
+logs/
+trades/
+detections/
+models/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Distribution
+*.whl
+*.tar.gz

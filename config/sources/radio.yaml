@@ -1,2 +1,21 @@
-# default radio url to listen to
-radio_url = "https://streams.kqed.org/kqedradio.mp3"
+# Radio source configuration
+
+# Default radio stream URL
+default_url: "https://streams.kqed.org/kqedradio.mp3"
+
+# Audio processing options
+audio:
+  codec: "pcm_s16le"
+  sample_rate: 16000
+  channels: 1
+
+# Stream connection settings
+buffer_size: 4096
+headers:
+  User-Agent: "Mozilla/5.0"
+
+# Auto-reconnect settings
+reconnect:
+  enabled: true
+  max_attempts: 5
+  delay: 10

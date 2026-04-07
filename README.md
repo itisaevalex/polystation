@@ -1,80 +1,90 @@
 # Polymarket Speech Bot
 
-This project demonstrates how to interact programmatically with Polymarket CLOB API and set up automated trading based on speech detection. It includes step-by-step examples for wallet management, market interaction, and real-time speech-triggered trading.
+Automated trading on [Polymarket](https://polymarket.com/) prediction markets by monitoring live audio streams for specific keywords. When a keyword is detected via speech recognition, the system executes a pre-configured trade through the Polymarket CLOB API.
 
-## Overview
+Supports YouTube, Twitter/X, and radio streams. Uses [Vosk](https://alphacephei.com/vosk/) for offline, low-latency speech recognition.
 
-This system enables automated trading on Polymarket prediction markets by monitoring audio streams (YouTube, Twitter, radio) for specific keywords and phrases. When target words are detected, the system automatically executes pre-configured trades.
+## Architecture
 
-The project includes several components:
-1. Wallet generation and management
-2. API authentication with Polymarket
-3. Market data retrieval
-4. Speech recognition using Vosk
-5. Automated trade execution
-
-## Key Features
-
-- **Speech Recognition**: Uses the `vosk-model-small-en-us-0.15` model to detect keywords in audio streams
-- **Multi-Platform Support**: Can monitor YouTube videos, Twitter spaces, and radio streams
-- **Configurable Trading**: Define markets, trigger words, and trade parameters via YAML configuration
-- **Real-Time Processing**: Low-latency detection and trade execution
-- **Wallet Management**: Utilities for wallet generation and blockchain interactions
-- **Comprehensive Logging**: Structured logging with rotating log files
-- **Error Handling**: Robust error handling with automatic retries
-
-## Quick Start
-
-1. Install requirements and dependencies
 ```
-pip install -r requirements.txt
-```
-
-2. Set up the configuration directories:
-```
-mkdir -p config/sources
+speech_bot/
+├── cli.py               # CLI entry point
+├── config.py            # YAML config loading
+├── logging.py           # Structured logging
+├── trading/
+│   ├── client.py        # Polymarket CLOB client
+│   ├── orders.py        # Order execution with retry
+│   └── recorder.py      # Trade/detection JSON recording
+├── speech/
+│   ├── recognizer.py    # Vosk speech recognition
+│   └── detector.py      # Keyword matching
+├── sources/
+│   ├── base.py          # Base source + StreamTrader loop
+│   ├── youtube.py       # YouTube audio source
+│   ├── twitter.py       # Twitter/X audio source
+│   └── radio.py         # Radio stream source
+└── wallet/
+    ├── generator.py     # BIP44 wallet generation
+    ├── allowances.py    # Contract approvals
+    └── credentials.py   # API key management
 ```
 
-3. Copy the YAML configuration files to their appropriate locations:
-   - `config/markets.yaml` - Market definitions
-   - `config/settings.yaml` - Global settings
-   - `config/sources/youtube.yaml` - YouTube-specific settings
-   - `config/sources/twitter.yaml` - Twitter-specific settings
-   - `config/sources/radio.yaml` - Radio-specific settings
+## Requirements
 
-4. Set up your wallet:
-   - Run `src/helpers/generate_wallet.py` to create a new wallet
-   - Fund wallet with Matic and USDC.e on Polygon network
+- Python 3.10+
+- FFmpeg
+- Polygon wallet funded with MATIC and USDC.e
 
-5. Configure environment variables:
-   - Copy `.env.example` to `.env`
-   - Set required values (HOST, PK, etc.)
+## Installation
 
-6. Run one of the monitoring scripts:
-   - `python youtube.py` for YouTube streams
-   - `python twitter.py` for Twitter broadcasts
-   - `python radio_transcript.py` for radio streams
+```bash
+git clone https://github.com/itisaevalex/assisted_speech_bot.git
+cd assisted_speech_bot
+pip install -e .
+```
 
-7. (Optional) Override default URL via command line:
-   - `python youtube.py --url "https://www.youtube.com/watch?v=YOUR_VIDEO_ID" --debug`
+For development tools (pytest, ruff, mypy):
 
-## Configuration System
+```bash
+pip install -e ".[dev]"
+```
 
-The project uses a YAML-based configuration system that separates code from configuration:
+## Configuration
 
-### Market Definitions (`config/markets.yaml`)
+### Environment Variables
 
-Define markets to monitor and their associated parameters:
+Copy `.env.example` to `.env` and fill in:
+
+| Variable | Description |
+|---|---|
+| `HOST` | Polymarket API host |
+| `PK` | Wallet private key |
+| `PBK` | Wallet public key |
+| `CLOB_API_KEY` | API key |
+| `CLOB_SECRET` | API secret |
+| `CLOB_PASS_PHRASE` | API passphrase |
+
+### YAML Config Files
+
+All configuration lives in `config/`:
+
+- `config/settings.yaml` -- Global settings (trading, speech recognition, paths)
+- `config/markets.yaml` -- Market definitions with keywords and trade parameters
+- `config/sources/youtube.yaml` -- YouTube-specific settings
+- `config/sources/twitter.yaml` -- Twitter/X-specific settings
+- `config/sources/radio.yaml` -- Radio-specific settings
+
+### Market Config Example
 
 ```yaml
 crypto_market:
   name: "Crypto/Bitcoin Mention"
-  token_id: "36604100954285610921025197770031955172882378..."
+  token_id: "36604100954285610921025197770031955172..."
   keywords:
     - "crypto"
     - "bitcoin"
     - "cryptocurrency"
-  trigger_type: "any"
+  trigger_type: "any"   # "any" (substring) or "exact" (full match)
   side: "BUY"
   price: 0.9
   size: 432
@@ -82,103 +92,57 @@ crypto_market:
   description: "Will Trump say crypto or Bitcoin during inauguration speech?"
 ```
 
-### Global Settings (`config/settings.yaml`)
+## Usage
 
-Define global application behavior:
+```bash
+# Monitor a YouTube stream
+speech-bot monitor youtube --url "https://youtube.com/watch?v=..." --debug
 
-```yaml
-trading:
-  prevent_duplicate_trades: true
-  max_daily_volume: 5000
-  
-speech:
-  chunk_size: 1
-  sample_rate: 16000
-  model_name: "vosk-model-small-en-us-0.15"
-  
-paths:
-  logs: "logs"
-  trades: "trades"
-  detections: "detections"
+# Monitor a Twitter/X broadcast
+speech-bot monitor twitter --url "https://x.com/i/broadcasts/..."
+
+# Monitor a radio stream
+speech-bot monitor radio --url "https://streams.example.com/stream.mp3"
+
+# Or use python -m
+python -m speech_bot monitor youtube
+
+# Wallet setup
+speech-bot setup wallet
+speech-bot setup allowances
+speech-bot setup api-keys
 ```
 
-### Source-Specific Settings (`config/sources/youtube.yaml`)
+## Key Features
 
-Configure settings specific to each audio source:
+- **Offline speech recognition** -- Vosk model runs locally with low latency
+- **Multi-platform audio** -- YouTube, Twitter/X, and radio streams
+- **Keyword triggers** -- "any" (substring) or "exact" matching modes
+- **Retry with backoff** -- Exponential backoff on order submission failures
+- **Structured logging** -- Rotating log files for main, trade, and speech events
+- **Trade recording** -- JSON logs of all trades and keyword detections
+- **Duplicate prevention** -- Blocks repeated trades for the same detection
+- **Auto-reconnect** -- Recovers automatically on stream failure
 
-```yaml
-default_url: "https://www.youtube.com/watch?v=ZJR8YzV-Wgc"
-ytdlp_options:
-  format: "bestaudio"
-  quiet: true
-audio:
-  codec: "pcm_s16le"
-  sample_rate: 16000
-  channels: 1
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest
+ruff check .
+mypy speech_bot/
 ```
 
-## Speech Recognition System
+## Links
 
-The project uses Vosk for speech recognition with the `vosk-model-small-en-us-0.15` model, which will be automatically downloaded on first run. The speech system:
-
-1. Captures audio from the specified source (YouTube, Twitter, radio)
-2. Processes audio in small chunks to minimize latency
-3. Converts speech to text using Vosk recognition
-4. Compares detected text against configured keyword lists
-5. Triggers trades when matches are found
-
-## Architecture
-
-```
-├── config/                 # Configuration files
-│   ├── markets.yaml        # Market definitions
-│   ├── settings.yaml       # Global application settings
-│   └── sources/            # Audio source configurations
-│       ├── youtube.yaml    # YouTube source settings
-│       ├── twitter.yaml    # Twitter source settings
-│       └── radio.yaml      # Radio source settings
-├── logs/                   # Logging directory
-│   ├── main.log            # Application logs
-│   ├── trades.log          # Trade execution logs
-│   └── speech.log          # Speech recognition logs
-├── trades/                 # Trade records (JSON)
-├── detections/             # Keyword detection records (JSON)
-├── src/                    # Source code
-│   ├── api_keys/           # API key management
-│   ├── helpers/            # Helper utilities
-│   ├── markets/            # Market interaction
-│   ├── trades/             # Trade execution
-│   └── utils/              # Utility functions
-│       └── config_loader.py # Configuration loading utility
-├── clob_client.py          # CLOB client implementation
-├── radio_transcript.py     # Radio stream monitoring
-├── trade_market.py         # Market trading example
-├── twitter.py              # Twitter stream monitoring
-└── youtube.py              # YouTube stream monitoring
-```
-
-## Logging System
-
-The application includes a comprehensive logging system:
-
-- **Main Logs**: General application events and startup/shutdown information
-- **Trade Logs**: Detailed records of trade executions and failures
-- **Speech Logs**: Transcripts of detected speech and keyword matches
-
-Log files are automatically rotated to avoid filling up disk space, and logs include detailed information for troubleshooting.
-
-## Requirements
-- Python 3.9+
-- FFmpeg (for audio processing)
-- Dependencies listed in requirements.txt
-- Vosk speech recognition model (downloaded automatically)
-
-## Sidenotes
-
-- YouTube video with more explanation - https://www.youtube.com/watch?v=ZbFTmDgSe_4
-- Polymarket CLOB API - https://docs.polymarket.com/
-- Polymarket CLOB Python client - https://github.com/Polymarket/py-clob-client
+- [YouTube explanation](https://www.youtube.com/watch?v=ZbFTmDgSe_4)
+- [Polymarket CLOB API docs](https://docs.polymarket.com/)
+- [Polymarket Python client](https://github.com/Polymarket/py-clob-client)
 
 ## Disclaimer
 
-This is an experimental tool provided for educational purposes. Use this code at your own risk. This is just a showcase of possible functionality of said libraries and APIs.
+Experimental / educational. Use at your own risk.
+
+## License
+
+MIT

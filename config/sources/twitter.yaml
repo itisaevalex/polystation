@@ -1,3 +1,23 @@
+# Twitter/X source configuration
 
-# default twitter url to monitor
-twitter_url = "https://x.com/i/broadcasts/1dRKZddyzbbJB"
+# Default Twitter URL to monitor
+default_url: "https://x.com/i/broadcasts/1dRKZddyzbbJB"
+
+# yt-dlp options for Twitter
+ytdlp_options:
+  format: "audio_only/audio/worst"
+  quiet: true
+  no_warnings: true
+  socket_timeout: 30
+
+# Audio processing options
+audio:
+  codec: "pcm_s16le"
+  sample_rate: 16000
+  channels: 1
+
+# Auto-reconnect settings
+reconnect:
+  enabled: true
+  max_attempts: 5
+  delay: 10
