@@ -76,9 +76,16 @@ class StreamTrader:
             source.source_name, logs_dir, debug
         )
 
-        self.main_logger.info("Initializing trading client")
-        self.trading_client = create_clob_client()
-        self.main_logger.info("Trading client initialized successfully")
+        self.trading_client = None
+        try:
+            self.main_logger.info("Initializing trading client")
+            self.trading_client = create_clob_client()
+            self.main_logger.info("Trading client initialized successfully")
+        except Exception as exc:
+            self.main_logger.warning(
+                "Trading client not available (missing HOST/PK env vars?): %s. "
+                "Speech detection will work but trades won't execute.", exc
+            )
 
         model_name = config.get_setting("speech", "model_name", "vosk-model-small-en-us-0.15")
         sample_rate = config.get_setting("speech", "sample_rate", 16000)
@@ -233,6 +240,15 @@ class StreamTrader:
             )
             trade_info["status"] = "skipped"
             trade_info["reason"] = "already_executed"
+            return
+
+        if self.trading_client is None:
+            self.trade_logger.warning(
+                "No trading client — skipping order for %s (detection logged)", market_id
+            )
+            trade_info["status"] = "skipped"
+            trade_info["reason"] = "no_trading_client"
+            record_trade(trades_dir, trade_info)
             return
 
         detection_time = time.time()

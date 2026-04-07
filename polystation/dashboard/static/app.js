@@ -863,22 +863,48 @@ function showStatus(el, message, isError) {
 }
 
 function bindSettingsTab() {
-  // Save Credentials
+  // Save Credentials — send to server to initialize trading client
   const saveCredsBtn = $("#btn-save-credentials");
   if (saveCredsBtn) {
-    saveCredsBtn.addEventListener("click", () => {
+    saveCredsBtn.addEventListener("click", async () => {
       const statusEl = $("#credentials-save-status");
+      const payload = {
+        host:            ($("#s-host")?.value || "https://clob.polymarket.com").trim(),
+        pk:              ($("#s-pk")?.value || "").trim(),
+        pbk:             ($("#s-pbk")?.value || "").trim(),
+        clob_api_key:    ($("#s-clob-api-key")?.value || "").trim(),
+        clob_secret:     ($("#s-clob-secret")?.value || "").trim(),
+        clob_pass_phrase:($("#s-clob-passphrase")?.value || "").trim(),
+      };
+
+      // Save non-secret fields to localStorage
       const raw = localStorage.getItem(SETTINGS_KEY);
       const existing = raw ? JSON.parse(raw) : {};
-      const updated = {
-        ...existing,
-        host:       ($("#s-host")?.value || "").trim(),
-        pbk:        ($("#s-pbk")?.value || "").trim(),
-        clobApiKey: ($("#s-clob-api-key")?.value || "").trim(),
-      };
-      // Never persist secrets — only non-sensitive values stored
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
-      showStatus(statusEl, "Saved (secrets not persisted)", false);
+      existing.host = payload.host;
+      existing.pbk = payload.pbk;
+      existing.clobApiKey = payload.clob_api_key;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(existing));
+
+      // Send to server to initialize the live trading client
+      if (payload.pk || payload.clob_api_key) {
+        try {
+          const resp = await apiFetch("/api/config/credentials", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(payload),
+          });
+          if (resp.status === "ok") {
+            showStatus(statusEl, "Credentials saved — live trading enabled", false);
+            addLog("INFO", "Trading credentials configured — dry run OFF");
+          } else {
+            showStatus(statusEl, `Error: ${resp.error}`, true);
+          }
+        } catch (e) {
+          showStatus(statusEl, `Server error: ${e.message}`, true);
+        }
+      } else {
+        showStatus(statusEl, "Saved locally (no keys provided for live trading)", false);
+      }
     });
   }
 

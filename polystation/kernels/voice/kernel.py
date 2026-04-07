@@ -77,6 +77,16 @@ class VoiceKernel(Kernel):
                 f"Available: {list(source_map.keys())}"
             )
 
+        # Check Vosk model exists before starting
+        import os
+        model_name = config.get_setting("speech", "model_name", "vosk-model-small-en-us-0.15")
+        if not os.path.exists(model_name):
+            raise RuntimeError(
+                f"Vosk model '{model_name}' not found. Download it first:\n"
+                f"  wget https://alphacephei.com/vosk/models/{model_name}.zip\n"
+                f"  unzip {model_name}.zip"
+            )
+
         source = source_cls(self.url, config)
         self._trader = StreamTrader(source=source, config=config, debug=self.debug)
 
