@@ -9,6 +9,9 @@
 // ------------------------------------------------------------------ //
 const State = {
   markets:         [],     // MarketInfo[]
+  marketsOffset:   0,      // pagination offset
+  marketsHasMore:  true,   // more pages available
+  marketsLoading:  false,  // currently loading
   selectedMarket:  null,   // MarketInfo
   selectedTokenIdx: 0,     // index into selectedMarket.token_ids
   orderBook:       null,   // raw /api/markets/book response
@@ -196,17 +199,39 @@ function addLog(level, msg) {
 // ------------------------------------------------------------------ //
 // Markets Panel                                                        //
 // ------------------------------------------------------------------ //
-async function refreshMarkets() {
+async function refreshMarkets(append = false) {
+  if (State.marketsLoading) return;
+  State.marketsLoading = true;
   try {
     const tab = State.activeTab;
-    const data = tab === "trending"
-      ? await apiFetch("/api/markets/trending")
-      : await apiFetch("/api/markets/");
-    State.markets = data;
+    if (tab === "trending") {
+      const data = await apiFetch("/api/markets/trending?limit=50");
+      State.markets = data;
+      State.marketsHasMore = false;
+    } else {
+      const offset = append ? State.marketsOffset : 0;
+      const resp = await apiFetch(`/api/markets/?offset=${offset}&limit=100`);
+      const newData = resp.data || [];
+      if (append) {
+        State.markets = State.markets.concat(newData);
+      } else {
+        State.markets = newData;
+      }
+      State.marketsOffset = (append ? offset : 0) + newData.length;
+      State.marketsHasMore = resp.has_more || false;
+    }
     renderMarkets();
+    const cnt = $("#markets-count");
+    if (cnt) cnt.textContent = `${State.markets.length}${State.marketsHasMore ? "+" : ""}`;
   } catch (e) {
     addLog("ERROR", `Markets fetch failed: ${e.message}`);
+  } finally {
+    State.marketsLoading = false;
   }
+}
+
+async function loadMoreMarkets() {
+  await refreshMarkets(true);
 }
 
 function renderMarkets() {
@@ -223,7 +248,7 @@ function renderMarkets() {
     return;
   }
 
-  tbody.innerHTML = markets.map(m => {
+  let html = markets.map(m => {
     const isSel = State.selectedMarket && m.condition_id === State.selectedMarket.condition_id;
     const bid = m.best_bid != null ? Number(m.best_bid).toFixed(4) : "—";
     const ask = m.best_ask != null ? Number(m.best_ask).toFixed(4) : "—";
@@ -239,6 +264,17 @@ function renderMarkets() {
       </tr>
     `;
   }).join("");
+
+  // Add "Load More" button if there are more pages
+  if (State.marketsHasMore) {
+    html += `<tr id="load-more-row"><td colspan="5" style="text-align:center; padding:8px;">
+      <button class="btn btn-green" onclick="loadMoreMarkets()" style="width:100%;">
+        Load More Markets (${State.markets.length} loaded)
+      </button>
+    </td></tr>`;
+  }
+
+  tbody.innerHTML = html;
 
   tbody.querySelectorAll("tr[data-cid]").forEach(tr => {
     tr.addEventListener("click", () => {
@@ -592,9 +628,30 @@ function bindStartForm() {
     const tokenInput = $("#kernel-token-id");
     const name = sel?.value;
     if (!name) return;
+
     const params = {};
-    const tokenId = tokenInput?.value.trim();
-    if (tokenId) params.token_id = tokenId;
+    let tokenId = tokenInput?.value.trim();
+
+    // Auto-fill from selected market if token_id is empty
+    if (!tokenId && State.selectedMarket && State.selectedMarket.token_ids?.length) {
+      tokenId = State.selectedMarket.token_ids[State.selectedTokenIdx || 0];
+      if (tokenInput) tokenInput.value = tokenId;
+    }
+
+    if (name === "market-maker" || name === "signal") {
+      if (!tokenId) {
+        addLog("WARN", "Select a market first or enter a token_id");
+        return;
+      }
+      params.token_id = tokenId;
+    }
+
+    if (name === "voice") {
+      // Voice kernel needs source_type; URL is optional
+      params.source_type = "youtube";
+      if (tokenId) params.url = tokenId; // reuse field for URL
+    }
+
     await startKernel(name, params);
   });
 }

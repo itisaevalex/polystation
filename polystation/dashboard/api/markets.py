@@ -12,39 +12,49 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/", summary="List active markets (Gamma API)")
-def list_markets(limit: int = 50) -> list[dict[str, Any]]:
-    """Return active markets sorted by volume descending."""
+def _market_to_dict(m: Any) -> dict[str, Any]:
+    return {
+        "condition_id": m.condition_id,
+        "question": m.question,
+        "slug": m.slug,
+        "volume": m.volume,
+        "liquidity": m.liquidity,
+        "best_bid": m.best_bid,
+        "best_ask": m.best_ask,
+        "last_trade_price": m.last_trade_price,
+        "token_ids": m.token_ids,
+        "outcomes": m.outcomes,
+        "neg_risk": m.neg_risk,
+        "image": m.image,
+    }
+
+
+@router.get("/", summary="List active open markets (paginated)")
+def list_markets(offset: int = 0, limit: int = 100, order: str = "volumeNum") -> dict[str, Any]:
+    """Return a page of active open markets sorted by the given field.
+
+    Polymarket has ~50,000+ active markets. Use offset/limit for pagination.
+    """
     from polystation.market.scanner import MarketScanner
 
     scanner = MarketScanner()
     try:
-        markets = scanner.get_active_markets(limit=limit)
+        markets = scanner.get_markets_page(offset=offset, limit=limit, order=order)
     except Exception as exc:
-        logger.error("Failed to fetch active markets: %s", exc)
+        logger.error("Failed to fetch markets page: %s", exc)
         raise HTTPException(502, f"Gamma API error: {exc}") from exc
 
-    return [
-        {
-            "condition_id": m.condition_id,
-            "question": m.question,
-            "slug": m.slug,
-            "volume": m.volume,
-            "liquidity": m.liquidity,
-            "best_bid": m.best_bid,
-            "best_ask": m.best_ask,
-            "last_trade_price": m.last_trade_price,
-            "token_ids": m.token_ids,
-            "outcomes": m.outcomes,
-            "neg_risk": m.neg_risk,
-            "image": m.image,
-        }
-        for m in markets
-    ]
+    return {
+        "data": [_market_to_dict(m) for m in markets],
+        "offset": offset,
+        "limit": limit,
+        "count": len(markets),
+        "has_more": len(markets) == limit,
+    }
 
 
 @router.get("/trending", summary="Trending markets by 24-hour volume")
-def trending_markets(limit: int = 10) -> list[dict[str, Any]]:
+def trending_markets(limit: int = 20) -> list[dict[str, Any]]:
     """Return markets with highest 24-hour volume."""
     from polystation.market.scanner import MarketScanner
 
@@ -55,26 +65,12 @@ def trending_markets(limit: int = 10) -> list[dict[str, Any]]:
         logger.error("Failed to fetch trending markets: %s", exc)
         raise HTTPException(502, f"Gamma API error: {exc}") from exc
 
-    return [
-        {
-            "condition_id": m.condition_id,
-            "question": m.question,
-            "volume": m.volume,
-            "liquidity": m.liquidity,
-            "best_bid": m.best_bid,
-            "best_ask": m.best_ask,
-            "last_trade_price": m.last_trade_price,
-            "token_ids": m.token_ids,
-            "outcomes": m.outcomes,
-            "image": m.image,
-        }
-        for m in markets
-    ]
+    return [_market_to_dict(m) for m in markets]
 
 
-@router.get("/search", summary="Search markets by slug keyword")
-def search_markets(q: str, limit: int = 20) -> list[dict[str, Any]]:
-    """Search active markets by slug keyword."""
+@router.get("/search", summary="Search markets by keyword")
+def search_markets(q: str, limit: int = 100) -> dict[str, Any]:
+    """Search active open markets by keyword. Returns up to *limit* results."""
     from polystation.market.scanner import MarketScanner
 
     scanner = MarketScanner()
@@ -84,18 +80,11 @@ def search_markets(q: str, limit: int = 20) -> list[dict[str, Any]]:
         logger.error("Market search failed for query '%s': %s", q, exc)
         raise HTTPException(502, f"Gamma API error: {exc}") from exc
 
-    return [
-        {
-            "condition_id": m.condition_id,
-            "question": m.question,
-            "volume": m.volume,
-            "best_bid": m.best_bid,
-            "best_ask": m.best_ask,
-            "token_ids": m.token_ids,
-            "outcomes": m.outcomes,
-        }
-        for m in markets
-    ]
+    return {
+        "query": q,
+        "data": [_market_to_dict(m) for m in markets],
+        "count": len(markets),
+    }
 
 
 @router.get("/book/{token_id}", summary="Order book snapshot for a token")

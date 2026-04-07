@@ -143,8 +143,58 @@ class MarketScanner:
         resp.raise_for_status()
         return [MarketInfo.from_gamma(m) for m in resp.json()]
 
-    def search_markets(self, query: str, limit: int = 20) -> list[MarketInfo]:
-        """Search active markets by slug keyword."""
+    def get_all_markets(self, page_size: int = 100, max_pages: int = 100) -> list[MarketInfo]:
+        """Paginate through ALL active open markets from the Gamma API.
+
+        Warning: there are ~50,000+ active markets. This can take a while.
+        Use ``get_markets_page`` for incremental loading instead.
+        """
+        all_markets: list[MarketInfo] = []
+        offset = 0
+        for _ in range(max_pages):
+            resp = requests.get(
+                f"{self.host}/markets",
+                params={
+                    "limit": str(page_size),
+                    "active": "true",
+                    "closed": "false",
+                    "offset": str(offset),
+                },
+                timeout=self.timeout,
+            )
+            resp.raise_for_status()
+            batch = resp.json()
+            if not batch:
+                break
+            all_markets.extend(MarketInfo.from_gamma(m) for m in batch)
+            offset += page_size
+        logger.info("Loaded %d total active markets", len(all_markets))
+        return all_markets
+
+    def get_markets_page(self, offset: int = 0, limit: int = 100,
+                         order: str = "volumeNum") -> list[MarketInfo]:
+        """Fetch a single page of active open markets with ordering."""
+        resp = requests.get(
+            f"{self.host}/markets",
+            params={
+                "limit": str(limit),
+                "active": "true",
+                "closed": "false",
+                "offset": str(offset),
+                "order": order,
+                "ascending": "false",
+            },
+            timeout=self.timeout,
+        )
+        resp.raise_for_status()
+        return [MarketInfo.from_gamma(m) for m in resp.json()]
+
+    def search_markets(self, query: str, limit: int = 100) -> list[MarketInfo]:
+        """Search active open markets by keyword in the question text.
+
+        The Gamma API ``slug`` parameter does partial matching on the slug
+        field, which is derived from the question text.
+        """
         resp = requests.get(
             f"{self.host}/markets",
             params={
@@ -152,6 +202,8 @@ class MarketScanner:
                 "active": "true",
                 "closed": "false",
                 "slug": query,
+                "order": "volumeNum",
+                "ascending": "false",
             },
             timeout=self.timeout,
         )
