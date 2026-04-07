@@ -796,19 +796,21 @@ function bindClearLog() {
 function bindNavTabs() {
   document.querySelectorAll(".nav-tab[data-tab]").forEach(btn => {
     btn.addEventListener("click", () => {
+      // Deactivate all tabs
       document.querySelectorAll(".nav-tab").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
+
+      // Hide all tab content (class-driven, no inline styles)
       document.querySelectorAll(".tab-content").forEach(t => {
         t.classList.remove("active");
-        t.style.display = "none";
+        t.removeAttribute("style"); // clear any leftover inline display
       });
+
+      // Show the selected tab
       const tab = document.getElementById(`tab-${btn.dataset.tab}`);
       if (tab) {
         tab.classList.add("active");
-        tab.style.display = btn.dataset.tab === "trading" ? "grid" : "flex";
-        // Refresh logs view when switching to logs tab
         if (btn.dataset.tab === "logs") renderLogsTab();
-        // Load settings values when switching to settings tab
         if (btn.dataset.tab === "settings") loadSettingsFromStorage();
       }
     });

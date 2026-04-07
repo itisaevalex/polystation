@@ -828,18 +828,28 @@ body.resizing-row .gutter-horizontal {
 .nav-tab.active { color: var(--green); border-bottom-color: var(--green); }
 
 /* ---- Tab content areas -------------------------------------- */
-.tab-content { display: none; overflow: hidden; }
-.tab-content.active { display: flex; flex-direction: column; overflow: hidden; }
+.tab-content {
+  display: none !important;
+  overflow: hidden;
+}
 
-/* Trading tab — inner grid layout: main panels + gutter + trade log */
-#tab-trading {
+.tab-content.active {
+  display: flex !important;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Trading tab uses grid instead of flex */
+#tab-trading.active {
+  display: grid !important;
   grid-template-rows: 1fr 5px 180px;
   overflow: hidden;
   min-height: 0;
 }
 
-#tab-trading.active {
-  display: grid;
+/* #main must fill the first grid row of the trading tab */
+#main {
+  min-height: 0;
 }
 
 /* ---- Logs tab ---------------------------------------------- */
