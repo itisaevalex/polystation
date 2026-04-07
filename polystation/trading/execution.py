@@ -19,6 +19,10 @@ class ExecutionEngine:
     Validates orders, submits them via the authenticated ClobClient, and
     updates the OrderManager and Portfolio on fills.  Dry-run mode lets
     kernels be tested end-to-end without touching the live exchange.
+
+    An optional RiskGuard is evaluated before every submission.  When the
+    guard vetoes an order it is immediately transitioned to REJECTED without
+    touching the CLOB.
     """
 
     def __init__(
@@ -27,11 +31,13 @@ class ExecutionEngine:
         order_manager: OrderManager,
         portfolio: Portfolio,
         metrics: Any = None,
+        risk_guard: Any = None,
     ) -> None:
         self.client = clob_client
         self.orders = order_manager
         self.portfolio = portfolio
         self.metrics = metrics
+        self.risk_guard = risk_guard
         self._dry_run: bool = False   # Set True to skip actual submission
 
     def set_dry_run(self, enabled: bool) -> None:
@@ -62,6 +68,12 @@ class ExecutionEngine:
         Returns:
             The server response dict on success, or None on failure.
         """
+        if self.risk_guard:
+            allowed, reason = self.risk_guard.check(order, self.portfolio, self.orders)
+            if not allowed:
+                self.orders.update_status(order.id, OrderStatus.REJECTED, error=f"Risk: {reason}")
+                return None
+
         if self._dry_run:
             logger.info(
                 "[DRY RUN] Would submit: %s %s %.0f @ %.4f",
@@ -92,6 +104,8 @@ class ExecutionEngine:
                     kernel_name=order.kernel_name,
                     realized_pnl=fill_realized,
                 )
+            if self.risk_guard and fill_realized < 0:
+                self.risk_guard.record_loss(fill_realized)
             return {"dry_run": True, "order_id": order.id}
 
         try:
@@ -136,6 +150,8 @@ class ExecutionEngine:
                         kernel_name=order.kernel_name,
                         realized_pnl=fill_realized,
                     )
+                if self.risk_guard and fill_realized < 0:
+                    self.risk_guard.record_loss(fill_realized)
                 logger.info(
                     "Order %s submitted and filled: %s", order.id, server_id
                 )

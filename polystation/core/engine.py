@@ -33,6 +33,7 @@ class TradingEngine:
         self.portfolio: Any = None
         self.execution: Any = None
         self.metrics: Any = None
+        self.prom: Any = None  # PolystationMetrics — attached by dashboard lifespan
 
     def register_kernel(self, kernel: Kernel) -> None:
         """Register a kernel with the engine. Does not start it."""

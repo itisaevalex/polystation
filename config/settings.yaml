@@ -48,14 +48,24 @@ paths:
 app:
   # Whether to run in debug mode
   debug: false
-  
+
   # Auto restart on failure
   auto_restart: true
-  
+
   # Notification settings
-  notifications: 
+  notifications:
     enabled: false
     email: ""
-    
+
   # Whether to record all speech transcripts
   record_all_transcripts: false
+
+# Pre-trade risk limits
+risk:
+  max_stake_per_trade: 500
+  max_gross_exposure: 10000
+  max_position_per_token: 1000
+  daily_loss_stop: -500
+  max_active_orders: 50
+  max_daily_trades: 200
+  enabled: true

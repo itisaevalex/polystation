@@ -12,6 +12,42 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+@router.get("/guard")
+def risk_guard_status() -> dict[str, Any]:
+    """Return the current RiskGuard configuration and daily counters.
+
+    Returns:
+        Dict with enabled flag, config thresholds, daily counters, and
+        the ten most-recent vetoes.  Returns a minimal disabled dict when
+        the RiskGuard is not wired into the execution engine.
+    """
+    eng = get_engine()
+    if eng.execution and eng.execution.risk_guard:
+        return eng.execution.risk_guard.get_status()
+    return {"enabled": False, "config": {}, "recent_vetoes": []}
+
+
+@router.post("/guard")
+def update_risk_guard(config: dict[str, Any]) -> dict[str, Any]:
+    """Update RiskGuard configuration fields at runtime.
+
+    Only fields present in RiskConfig are applied; unknown keys are silently
+    ignored.  Returns the updated status dict after applying the changes.
+
+    Args:
+        config: Partial or full dict of RiskConfig field names to new values.
+
+    Returns:
+        Updated RiskGuard status dict, or an error dict when the guard is
+        not initialized.
+    """
+    eng = get_engine()
+    if eng.execution and eng.execution.risk_guard:
+        eng.execution.risk_guard.update_config(**config)
+        return eng.execution.risk_guard.get_status()
+    return {"error": "RiskGuard not initialized"}
+
+
 @router.get("/summary")
 def risk_summary() -> dict[str, Any]:
     """Return risk-related portfolio data.

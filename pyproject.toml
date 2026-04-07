@@ -43,6 +43,10 @@ notebook = [
     "numpy>=1.26",
     "pandas>=2.1",
 ]
+monitoring = [
+    "prometheus_client>=0.20",
+    "redis>=5.0",
+]
 
 [project.scripts]
 polystation = "polystation.cli:main"
