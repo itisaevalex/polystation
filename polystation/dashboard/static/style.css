@@ -67,7 +67,7 @@ html, body {
 /* ---- Layout -------------------------------------------------- */
 #app {
   display: grid;
-  grid-template-rows: 44px 1fr 180px;
+  grid-template-rows: 44px 1fr 5px 180px;
   height: 100vh;
   overflow: hidden;
 }
@@ -712,6 +712,73 @@ html, body {
 .text-right  { text-align: right; }
 .font-bold   { font-weight: 700; }
 .truncate    { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- Resize gutters ---------------------------------------- */
+.gutter {
+  position: relative;
+  z-index: 50;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.gutter:hover,
+.gutter.active {
+  background: var(--green-dim);
+  transition-delay: 0.1s;
+}
+
+/* Vertical gutters (between columns) — positioned at right edge of their column */
+.gutter-col {
+  width: 5px;
+  cursor: col-resize;
+  justify-self: end;
+  pointer-events: auto;
+}
+
+/* Horizontal gutters (between rows within #main) — positioned at bottom edge of their row */
+.gutter-row {
+  height: 5px;
+  cursor: row-resize;
+  align-self: end;
+  pointer-events: auto;
+}
+
+/* Bottom gutter (between #main and trade log) */
+.gutter-horizontal {
+  cursor: row-resize;
+  height: 5px;
+  background: var(--border);
+}
+
+.gutter-horizontal:hover,
+.gutter-horizontal.active {
+  background: var(--green-dim);
+}
+
+/* Prevent text selection while dragging */
+body.resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+body.resizing-row {
+  cursor: row-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+body.resizing *,
+body.resizing-row * {
+  pointer-events: none !important;
+}
+
+body.resizing .gutter,
+body.resizing-row .gutter,
+body.resizing .gutter-horizontal,
+body.resizing-row .gutter-horizontal {
+  pointer-events: auto !important;
+}
 
 /* ---- Responsive (minimal — designed for 1280+ wide) -------- */
 @media (max-width: 1100px) {

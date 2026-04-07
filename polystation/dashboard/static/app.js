@@ -679,6 +679,169 @@ async function init() {
   startPolling();
 }
 
+/* ================================================================
+   PANEL RESIZE — Drag handles between grid areas
+   ================================================================ */
+
+(function initResizeHandles() {
+
+  const main = document.getElementById("main");
+  const app  = document.getElementById("app");
+  if (!main || !app) return;
+
+  // Current sizes (pixels) — start from CSS defaults
+  let colSizes = null;   // [col1, col2, col3] in px
+  let rowSizes = null;   // [row1, row2] in px
+  let logHeight = 180;   // trade log height in px
+
+  function getComputedGridSizes() {
+    const cols = getComputedStyle(main).gridTemplateColumns.split(/\s+/).map(parseFloat);
+    const rows = getComputedStyle(main).gridTemplateRows.split(/\s+/).map(parseFloat);
+    return { cols, rows };
+  }
+
+  function applyGridCols() {
+    if (!colSizes) return;
+    main.style.gridTemplateColumns = colSizes.map(s => s + "px").join(" ");
+  }
+
+  function applyGridRows() {
+    if (!rowSizes) return;
+    main.style.gridTemplateRows = rowSizes.map(s => s + "px").join(" ");
+  }
+
+  function applyLogHeight() {
+    app.style.gridTemplateRows = `44px 1fr 5px ${logHeight}px`;
+  }
+
+  // Generic drag handler
+  function startDrag(e, onMove, cursorClass) {
+    e.preventDefault();
+    const target = e.currentTarget;
+    target.classList.add("active");
+    document.body.classList.add(cursorClass);
+
+    function move(ev) { onMove(ev); }
+    function up() {
+      target.classList.remove("active");
+      document.body.classList.remove(cursorClass);
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+    }
+
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", up);
+  }
+
+  // --- Column gutters ---
+
+  // Gutter between col 1 and col 2
+  const gc1 = document.getElementById("gutter-col-1");
+  if (gc1) {
+    gc1.addEventListener("mousedown", function(e) {
+      if (!colSizes) colSizes = getComputedGridSizes().cols;
+      const startX = e.clientX;
+      const startCol1 = colSizes[0];
+      const startCol2 = colSizes[1];
+      const total = startCol1 + startCol2;
+
+      startDrag(e, function(ev) {
+        const dx = ev.clientX - startX;
+        const newCol1 = Math.max(200, Math.min(total - 200, startCol1 + dx));
+        colSizes[0] = newCol1;
+        colSizes[1] = total - newCol1;
+        applyGridCols();
+      }, "resizing");
+    });
+  }
+
+  // Gutter between col 2 and col 3
+  const gc2 = document.getElementById("gutter-col-2");
+  if (gc2) {
+    gc2.addEventListener("mousedown", function(e) {
+      if (!colSizes) colSizes = getComputedGridSizes().cols;
+      const startX = e.clientX;
+      const startCol2 = colSizes[1];
+      const startCol3 = colSizes[2];
+      const total = startCol2 + startCol3;
+
+      startDrag(e, function(ev) {
+        const dx = ev.clientX - startX;
+        const newCol2 = Math.max(200, Math.min(total - 180, startCol2 + dx));
+        colSizes[1] = newCol2;
+        colSizes[2] = total - newCol2;
+        applyGridCols();
+      }, "resizing");
+    });
+  }
+
+  // --- Row gutters (within #main) ---
+
+  // Gutter between row 1 and row 2 in middle column
+  const grMid = document.getElementById("gutter-row-mid");
+  if (grMid) {
+    grMid.addEventListener("mousedown", function(e) {
+      if (!rowSizes) rowSizes = getComputedGridSizes().rows;
+      const startY = e.clientY;
+      const startRow1 = rowSizes[0];
+      const startRow2 = rowSizes[1];
+      const total = startRow1 + startRow2;
+
+      startDrag(e, function(ev) {
+        const dy = ev.clientY - startY;
+        const newRow1 = Math.max(100, Math.min(total - 100, startRow1 + dy));
+        rowSizes[0] = newRow1;
+        rowSizes[1] = total - newRow1;
+        applyGridRows();
+      }, "resizing-row");
+    });
+  }
+
+  // Gutter between row 1 and row 2 in right column
+  const grRight = document.getElementById("gutter-row-right");
+  if (grRight) {
+    grRight.addEventListener("mousedown", function(e) {
+      if (!rowSizes) rowSizes = getComputedGridSizes().rows;
+      const startY = e.clientY;
+      const startRow1 = rowSizes[0];
+      const startRow2 = rowSizes[1];
+      const total = startRow1 + startRow2;
+
+      startDrag(e, function(ev) {
+        const dy = ev.clientY - startY;
+        const newRow1 = Math.max(100, Math.min(total - 100, startRow1 + dy));
+        rowSizes[0] = newRow1;
+        rowSizes[1] = total - newRow1;
+        applyGridRows();
+      }, "resizing-row");
+    });
+  }
+
+  // --- Bottom gutter (trade log height) ---
+
+  const gBottom = document.getElementById("gutter-bottom");
+  if (gBottom) {
+    gBottom.addEventListener("mousedown", function(e) {
+      const startY = e.clientY;
+      const startHeight = logHeight;
+
+      startDrag(e, function(ev) {
+        const dy = ev.clientY - startY;
+        logHeight = Math.max(60, Math.min(500, startHeight - dy));
+        applyLogHeight();
+      }, "resizing-row");
+    });
+  }
+
+  // Recalculate on window resize
+  window.addEventListener("resize", function() {
+    colSizes = null;
+    rowSizes = null;
+  });
+
+})();
+
+
 // Boot when DOM is ready
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init);
