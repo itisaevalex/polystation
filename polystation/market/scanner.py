@@ -189,75 +189,41 @@ class MarketScanner:
         resp.raise_for_status()
         return [MarketInfo.from_gamma(m) for m in resp.json()]
 
-    def search_markets(self, query: str, limit: int = 100) -> list[MarketInfo]:
-        """Search active open markets by keyword.
+    def search_markets(self, query: str, limit: int = 200) -> list[MarketInfo]:
+        """Search active open markets by keyword using the Gamma public-search API.
 
-        The Gamma API has no text search endpoint. We paginate through
-        events (checking titles + sub-market questions) and also scan
-        flat markets for broader coverage.
+        Uses the ``/public-search`` endpoint which provides proper full-text
+        search across event titles and market questions. Returns individual
+        open sub-markets from matching events, sorted by volume.
         """
-        query_lower = query.lower().strip()
-        if not query_lower:
+        query = query.strip()
+        if not query:
             return []
+
+        resp = requests.get(
+            f"{self.host}/public-search",
+            params={
+                "q": query,
+                "limit_per_type": "50",
+                "events_status": "active",
+            },
+            timeout=self.timeout,
+        )
+        resp.raise_for_status()
+        data = resp.json()
 
         results: list[MarketInfo] = []
         seen: set[str] = set()
 
-        def _check_market(m: dict[str, Any], event_title: str = "") -> None:
-            if m.get("closed", False):
-                return
-            question = (m.get("question") or "").lower()
-            slug = (m.get("slug") or "").lower()
-            cid = m.get("conditionId", m.get("condition_id", ""))
-            if cid in seen:
-                return
-            if query_lower in event_title or query_lower in question or query_lower in slug:
+        for event in data.get("events", []):
+            for m in event.get("markets", []):
+                if m.get("closed", False):
+                    continue
+                cid = m.get("conditionId", m.get("condition_id", ""))
+                if cid in seen:
+                    continue
                 seen.add(cid)
                 results.append(MarketInfo.from_gamma(m))
-
-        # 1) Search through events (paginated, up to 2000 events)
-        for offset in range(0, 2000, 200):
-            try:
-                resp = requests.get(
-                    f"{self.host}/events",
-                    params={
-                        "limit": "200",
-                        "active": "true",
-                        "closed": "false",
-                        "offset": str(offset),
-                    },
-                    timeout=self.timeout,
-                )
-                resp.raise_for_status()
-                events = resp.json()
-                if not events:
-                    break
-                for event in events:
-                    title = (event.get("title") or "").lower()
-                    for m in event.get("markets", []):
-                        _check_market(m, title)
-            except Exception:
-                logger.warning("Events search page at offset %d failed", offset)
-                break
-
-        # 2) Also scan flat markets (first 500 by volume) for stragglers
-        try:
-            resp = requests.get(
-                f"{self.host}/markets",
-                params={
-                    "limit": "500",
-                    "active": "true",
-                    "closed": "false",
-                    "order": "volumeNum",
-                    "ascending": "false",
-                },
-                timeout=self.timeout,
-            )
-            resp.raise_for_status()
-            for m in resp.json():
-                _check_market(m)
-        except Exception:
-            logger.warning("Flat markets search fallback failed")
 
         results.sort(key=lambda m: m.volume, reverse=True)
         return results[:limit]
