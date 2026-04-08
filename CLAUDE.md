@@ -55,14 +55,14 @@ ruff check polystation/
 - [x] Commit 3: Position exit automation — PositionManager with trailing stop, profit target, stop loss, time exit
 - [x] Commits from Phase 1-2: core engine, market data, portfolio, orders, execution, 3 kernels, dashboard (5 tabs), RiskGuard, Prometheus, Redis, Grafana, MetricsCollector
 
-### Remaining (in order)
-- [ ] Commit 4: WebSocket live feed in dashboard — wire MarketFeed into WS hub, real-time book updates
-- [ ] Commit 5: More order types — Market, FOK, IOC, GTD, manual order placement from dashboard
-- [ ] Commit 6: Backtesting — PaperExchange, BacktestEngine, BacktestResult (P&L, drawdown, Sharpe)
-- [ ] Commit 7: DeribitExchange adapter — WebSocket-first, BTC-PERPETUAL + futures, config/exchanges/deribit.yaml
-- [ ] Commit 8: BinanceExchange adapter — REST + WS via aiohttp, spot + USDM futures, HMAC auth
-- [ ] Commit 9: Agentic kernel framework — LLM client (Anthropic/OpenAI), data source plugins (YouTube, news, social), decision loop
-- [ ] Commit 10: Deployment — Dockerfile, unified docker-compose.yml, deploy.sh, systemd service, /health endpoint
+### Remaining
+All core features built. Next steps are integration testing and refinement:
+- [ ] Wire PositionManager into dashboard app.py lifespan
+- [ ] Add Backtest tab to dashboard frontend
+- [ ] IBKR exchange adapter (TWS API)
+- [ ] Historical data loading for backtesting (CSV, Polymarket trades API)
+- [ ] Restore portfolio state from SQLite on startup
+- [ ] Dashboard: manual order placement form on Trading tab
 
 ## Test Count
-577 passed, 11 skipped (Redis live tests)
+653 passed, 11 skipped (Redis live tests)
