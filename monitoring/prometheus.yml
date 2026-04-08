@@ -7,4 +7,5 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
+          - polystation:8420
           - host.docker.internal:8420

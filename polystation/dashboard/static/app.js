@@ -162,6 +162,7 @@ function connectWS() {
 function handleWsMessage(msg) {
   if (msg.type === "pong") return;
   if (msg.type === "connected") return;
+  if (msg.type === "subscribed_market" || msg.type === "unsubscribed_market") return;
   if (msg.type === "trade") {
     addLog("TRADE", `${msg.side} ${fmtK(msg.size)} @ ${fmtPrice(msg.price)} — ${(msg.kernel || "")}`);
     refreshOrders();
@@ -173,6 +174,20 @@ function handleWsMessage(msg) {
     refreshStrategies();
   } else if (msg.type === "price_update") {
     // Optionally update specific cells
+  } else if (msg.type === "book_update") {
+    // Live order book update pushed from the server
+    const tokenId = msg.token_id;
+    const mkt = State.selectedMarket;
+    if (!mkt) return;
+    const tokenIds = mkt.token_ids || [];
+    const activeToken = tokenIds[State.selectedTokenIdx] || tokenIds[0];
+    if (tokenId === activeToken && msg.data) {
+      State.orderBook = msg.data;
+      renderOrderBook(msg.data);
+      if (msg.data.midpoint != null || msg.data.best_bid != null) {
+        renderPriceSummary(msg.data);
+      }
+    }
   }
 }
 
@@ -387,11 +402,29 @@ function renderMarkets() {
 }
 
 function selectMarket(mkt) {
+  // Unsubscribe from the previous market before switching
+  const ws = State.ws;
+  const prevMkt = State.selectedMarket;
+  if (ws && ws.readyState === WebSocket.OPEN && prevMkt) {
+    const prevTokenIds = prevMkt.token_ids || [];
+    prevTokenIds.forEach(tid => {
+      ws.send(JSON.stringify({ type: "unsubscribe_market", token_id: tid }));
+    });
+  }
+
   State.selectedMarket = mkt;
   State.selectedTokenIdx = 0;
   renderMarkets();
   renderSelectedMarketHeader();
   refreshOrderBook();
+
+  // Subscribe to the new market's tokens
+  if (ws && ws.readyState === WebSocket.OPEN && mkt) {
+    const tokenIds = mkt.token_ids || [];
+    tokenIds.forEach(tid => {
+      ws.send(JSON.stringify({ type: "subscribe_market", token_id: tid }));
+    });
+  }
 }
 
 function renderSelectedMarketHeader() {

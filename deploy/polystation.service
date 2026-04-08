@@ -1,0 +1,26 @@
+[Unit]
+Description=Polystation Trading Station
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=polystation
+Group=polystation
+WorkingDirectory=/opt/polystation
+ExecStart=/opt/polystation/.venv/bin/uvicorn polystation.dashboard.app:create_app --factory --host 0.0.0.0 --port 8420
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+EnvironmentFile=-/opt/polystation/.env
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/polystation/data /opt/polystation/logs
+
+[Install]
+WantedBy=multi-user.target

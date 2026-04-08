@@ -5,11 +5,55 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from polystation.dashboard.app import get_engine
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+class CreateOrderRequest(BaseModel):
+    """Request body for manual order placement via the dashboard."""
+
+    token_id: str
+    side: str       # "BUY" or "SELL"
+    price: float
+    size: float
+    order_type: str = "GTC"
+    expiry: str = ""
+
+
+@router.post("/create", summary="Place a manual order")
+async def create_order(req: CreateOrderRequest) -> dict[str, Any]:
+    """Create an order and immediately submit it through the execution engine.
+
+    Args:
+        req: Order parameters validated by :class:`CreateOrderRequest`.
+
+    Returns:
+        Dict with the serialised order and the execution result.
+
+    Raises:
+        HTTPException: 400 when order submission fails.
+    """
+    eng = get_engine()
+    order = eng.orders.create_order(
+        token_id=req.token_id,
+        side=req.side,
+        price=req.price,
+        size=req.size,
+        order_type=req.order_type,
+        expiry=req.expiry,
+        kernel_name="dashboard",
+    )
+    result = await eng.execution.submit_order(order)
+    if result is None:
+        raise HTTPException(
+            status_code=400,
+            detail=order.error or "Order submission failed",
+        )
+    return {"order": order.to_dict(), "result": result}
 
 
 @router.get("/", summary="Recent orders (most-recent first)")

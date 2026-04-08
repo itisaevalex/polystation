@@ -51,11 +51,11 @@ ruff check polystation/
 
 ### Done
 - [x] Commit 1: Exchange ABC + PolymarketExchange adapter
+- [x] Commit 2: Persistent state (SQLite) — 5 tables, WAL mode, restore on startup
+- [x] Commit 3: Position exit automation — PositionManager with trailing stop, profit target, stop loss, time exit
 - [x] Commits from Phase 1-2: core engine, market data, portfolio, orders, execution, 3 kernels, dashboard (5 tabs), RiskGuard, Prometheus, Redis, Grafana, MetricsCollector
 
 ### Remaining (in order)
-- [ ] Commit 2: Persistent state (SQLite) — aiosqlite, tables for orders/positions/trades/pnl_snapshots/kernel_state, restore on startup
-- [ ] Commit 3: Position exit automation — PositionManager with trailing stop, profit target, stop loss, time exit, expiry exit
 - [ ] Commit 4: WebSocket live feed in dashboard — wire MarketFeed into WS hub, real-time book updates
 - [ ] Commit 5: More order types — Market, FOK, IOC, GTD, manual order placement from dashboard
 - [ ] Commit 6: Backtesting — PaperExchange, BacktestEngine, BacktestResult (P&L, drawdown, Sharpe)
@@ -65,4 +65,4 @@ ruff check polystation/
 - [ ] Commit 10: Deployment — Dockerfile, unified docker-compose.yml, deploy.sh, systemd service, /health endpoint
 
 ## Test Count
-465 passed, 11 skipped (Redis live tests)
+577 passed, 11 skipped (Redis live tests)

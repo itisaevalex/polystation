@@ -107,7 +107,8 @@ class PolymarketExchange(Exchange):
         Args:
             symbol: Token ID (``token_id`` in CLOB parlance).
             side: ``"BUY"`` or ``"SELL"``.
-            price: Limit price between 0 and 1.
+            price: Limit price between 0 and 1.  For MARKET orders this value
+                is ignored — the current best price is fetched automatically.
             size: Number of shares.
             order_type: Time-in-force.  Defaults to GTC.
 
@@ -118,15 +119,40 @@ class PolymarketExchange(Exchange):
             return OrderResult(order_id="", status="rejected", error="Not connected")
 
         from py_clob_client.clob_types import OrderArgs
+        from py_clob_client.clob_types import OrderType as ClobOrderType
+
+        # Map internal OrderType to py-clob-client OrderType.
+        # Polymarket uses FAK (Fill-And-Kill) for IOC-like behaviour.
+        ORDER_TYPE_MAP: dict[OrderType, ClobOrderType] = {
+            OrderType.GTC: ClobOrderType.GTC,
+            OrderType.FOK: ClobOrderType.FOK,
+            OrderType.IOC: ClobOrderType.FOK,   # Polymarket uses FAK/FOK for IOC
+            OrderType.GTD: ClobOrderType.GTD,
+        }
+
+        # For MARKET orders fetch the best available price first.
+        effective_price = price
+        if order_type == OrderType.MARKET:
+            best = await self.get_price(symbol, side)
+            if best is None:
+                return OrderResult(
+                    order_id="", status="rejected",
+                    error="Could not determine market price"
+                )
+            effective_price = best
+
+        clob_order_type: ClobOrderType | None = ORDER_TYPE_MAP.get(order_type)
 
         def _place() -> Any:
             order_args = OrderArgs(
-                price=price,
+                price=effective_price,
                 size=size,
                 side=side,
                 token_id=symbol,
             )
             signed = self._client.create_order(order_args)
+            if clob_order_type is not None:
+                return self._client.post_order(signed, orderType=clob_order_type)
             return self._client.post_order(signed)
 
         try:
@@ -136,7 +162,7 @@ class PolymarketExchange(Exchange):
                 return OrderResult(
                     order_id=oid,
                     status="accepted",
-                    filled_price=price,
+                    filled_price=effective_price,
                     filled_size=size,
                 )
             return OrderResult(order_id="", status="rejected", error="No response from CLOB")

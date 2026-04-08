@@ -1,0 +1,8 @@
+# Deribit exchange configuration
+deribit:
+  api_key: ""
+  api_secret: ""
+  testnet: true
+  instruments:
+    - BTC-PERPETUAL
+    - ETH-PERPETUAL

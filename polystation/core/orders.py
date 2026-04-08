@@ -50,7 +50,8 @@ class Order:
     price: float
     size: float
     status: OrderStatus = OrderStatus.PENDING
-    order_type: str = "GTC"   # GTC, FOK, GTD, FAK
+    order_type: str = "GTC"   # GTC, FOK, IOC, GTD, MARKET
+    expiry: str = ""           # ISO-8601 expiry timestamp for GTD orders
     filled_size: float = 0.0
     avg_fill_price: float = 0.0
     market_id: str = ""
@@ -88,6 +89,7 @@ class Order:
             "avg_fill_price": self.avg_fill_price,
             "status": self.status.value,
             "order_type": self.order_type,
+            "expiry": self.expiry,
             "market_id": self.market_id,
             "kernel_name": self.kernel_name,
             "exchange": self.exchange,
@@ -120,6 +122,7 @@ class OrderManager:
         kernel_name: str = "",
         order_type: str = "GTC",
         exchange: str = "",
+        expiry: str = "",
     ) -> Order:
         """Create, register, and return a new order in PENDING state.
 
@@ -132,6 +135,7 @@ class OrderManager:
             kernel_name: Name of the kernel placing the order.
             order_type: Time-in-force type. Defaults to "GTC".
             exchange: Exchange adapter name (e.g. "polymarket").
+            expiry: ISO-8601 expiry timestamp for GTD orders.
 
         Returns:
             The newly created Order.
@@ -148,6 +152,7 @@ class OrderManager:
             kernel_name=kernel_name,
             order_type=order_type,
             exchange=exchange,
+            expiry=expiry,
         )
         self.orders[order_id] = order
         logger.info(

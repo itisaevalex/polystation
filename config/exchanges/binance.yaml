@@ -1,0 +1,9 @@
+# Binance exchange configuration
+binance:
+  api_key: ""
+  api_secret: ""
+  futures: false
+  testnet: true
+  symbols:
+    - BTCUSDT
+    - ETHUSDT
