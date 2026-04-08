@@ -56,13 +56,18 @@ ruff check polystation/
 - [x] Commits from Phase 1-2: core engine, market data, portfolio, orders, execution, 3 kernels, dashboard (5 tabs), RiskGuard, Prometheus, Redis, Grafana, MetricsCollector
 
 ### Remaining
-All core features built. Next steps are integration testing and refinement:
-- [ ] Wire PositionManager into dashboard app.py lifespan
-- [ ] Add Backtest tab to dashboard frontend
 - [ ] IBKR exchange adapter (TWS API)
-- [ ] Historical data loading for backtesting (CSV, Polymarket trades API)
-- [ ] Restore portfolio state from SQLite on startup
-- [ ] Dashboard: manual order placement form on Trading tab
+- [ ] Historical data loader for backtesting (CSV file import, Polymarket trades API bulk download)
+- [ ] Wire RiskGuard config form on Risk tab to POST /api/risk/guard
+- [ ] Wire exit config form on Risk tab to POST /api/risk/exits
+
+### Done (all wired)
+- [x] PositionManager in app.py lifespan (disabled by default)
+- [x] Backtest tab with form + Chart.js P&L chart
+- [x] Portfolio state restore from SQLite on startup
+- [x] Quick Trade panel in order book (BUY/SELL + auto-price)
+- [x] Price history charts (modal overlay, 1D/1W/1M/ALL intervals)
+- [x] Manual order placement API (POST /api/orders/create)
 
 ## Test Count
-653 passed, 11 skipped (Redis live tests)
+728 passed, 11 skipped (Redis live tests)
