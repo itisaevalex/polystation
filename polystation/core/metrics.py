@@ -101,6 +101,7 @@ class MetricsCollector:
         # References set after construction via set_references()
         self._portfolio: Any = None
         self._orders: Any = None
+        self._db: Any = None  # StateDatabase — set via set_database()
 
     def set_references(self, portfolio: Any, orders: Any) -> None:
         """Set references to Portfolio and OrderManager for snapshot access.
@@ -111,6 +112,16 @@ class MetricsCollector:
         """
         self._portfolio = portfolio
         self._orders = orders
+
+    def set_database(self, db: Any) -> None:
+        """Attach a StateDatabase for persistent snapshot storage.
+
+        Args:
+            db: Connected :class:`~polystation.persistence.database.StateDatabase`
+                instance.  When set, every call to :meth:`snapshot` will also
+                persist the snapshot to SQLite.
+        """
+        self._db = db
 
     def record_fill(
         self,
@@ -193,6 +204,11 @@ class MetricsCollector:
             "trade_count": p.trade_count,
         }
         self.pnl_snapshots.append(snap)
+        if self._db is not None:
+            try:
+                self._db.save_pnl_snapshot(snap)
+            except Exception:
+                logger.exception("Failed to persist P&L snapshot to database")
 
     async def run_snapshots(self) -> None:
         """Background task that takes periodic P&L snapshots."""

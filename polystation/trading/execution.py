@@ -35,6 +35,7 @@ class ExecutionEngine:
         metrics: Any | None = None,
         risk_guard: Any | None = None,
         redis_client: Any | None = None,
+        db: Any | None = None,
     ) -> None:
         self.exchange = exchange
         self.orders = order_manager
@@ -42,6 +43,7 @@ class ExecutionEngine:
         self.metrics = metrics
         self.risk_guard = risk_guard
         self.redis = redis_client
+        self.db = db
         self._dry_run: bool = False
 
     def set_dry_run(self, enabled: bool) -> None:
@@ -107,6 +109,24 @@ class ExecutionEngine:
             if self.redis:
                 self.redis.publish_trade({"order_id": order.id, "side": order.side,
                     "price": order.price, "size": order.size, "kernel": order.kernel_name})
+            if self.db:
+                try:
+                    self.db.save_order(order.to_dict())
+                    self.db.save_trade({
+                        "order_id": order.id,
+                        "token_id": order.token_id,
+                        "side": order.side,
+                        "price": order.price,
+                        "size": order.size,
+                        "pnl": fill_realized,
+                        "kernel_name": order.kernel_name,
+                        "exchange": order.exchange,
+                    })
+                    pos = self.portfolio.get_position(order.token_id)
+                    if pos is not None:
+                        self.db.save_position(pos.to_dict())
+                except Exception:
+                    logger.exception("Failed to persist dry-run fill to database")
             return {"dry_run": True, "order_id": order.id}
 
         if self.exchange is None:
@@ -153,6 +173,24 @@ class ExecutionEngine:
                 if self.redis:
                     self.redis.publish_trade({"order_id": order.id, "side": order.side,
                         "price": order.price, "size": order.size, "kernel": order.kernel_name})
+                if self.db:
+                    try:
+                        self.db.save_order(order.to_dict())
+                        self.db.save_trade({
+                            "order_id": order.id,
+                            "token_id": order.token_id,
+                            "side": order.side,
+                            "price": result.filled_price or order.price,
+                            "size": order.size,
+                            "pnl": fill_realized,
+                            "kernel_name": order.kernel_name,
+                            "exchange": order.exchange,
+                        })
+                        pos = self.portfolio.get_position(order.token_id)
+                        if pos is not None:
+                            self.db.save_position(pos.to_dict())
+                    except Exception:
+                        logger.exception("Failed to persist live fill to database")
                 logger.info("Order %s submitted via %s: %s", order.id, self.exchange.name, server_id)
                 return {"order_id": server_id, "status": result.status}
 

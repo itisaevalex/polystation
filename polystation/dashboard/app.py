@@ -88,6 +88,13 @@ async def lifespan(app: FastAPI):
     )
     engine.execution.set_dry_run(True)  # Safe default
 
+    # Persistence — SQLite state database
+    from polystation.persistence.database import StateDatabase
+    engine.db = StateDatabase()
+    engine.db.connect()
+    engine.metrics.set_database(engine.db)
+    engine.execution.db = engine.db
+
     await engine.start()
 
     # Background tasks
@@ -112,6 +119,9 @@ async def lifespan(app: FastAPI):
 
     if engine.redis:
         engine.redis.close()
+
+    if engine.db:
+        engine.db.close()
 
     await engine.stop()
     logger.info("Polystation dashboard stopped")

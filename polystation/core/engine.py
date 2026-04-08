@@ -33,6 +33,7 @@ class TradingEngine:
         self.portfolio: Any = None
         self.execution: Any = None
         self.exchanges: dict[str, Any] = {}  # name -> Exchange adapter
+        self.db: Any = None  # StateDatabase — attached in persistence phase
 
     def register_exchange(self, exchange: Any) -> None:
         """Register an exchange adapter with the engine.
