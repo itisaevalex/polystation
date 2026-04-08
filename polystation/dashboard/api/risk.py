@@ -63,6 +63,48 @@ def risk_summary() -> dict[str, Any]:
     return eng.metrics.get_risk_summary()
 
 
+@router.get("/exits")
+def exit_config_status() -> dict[str, Any]:
+    """Return the current PositionManager exit configuration and status.
+
+    Returns:
+        Dict from :meth:`~polystation.automation.position_manager.PositionManager.get_status`,
+        or an error dict when the PositionManager has not been initialized.
+    """
+    eng = get_engine()
+    if eng.position_manager:
+        return eng.position_manager.get_status()
+    return {"error": "PositionManager not initialized"}
+
+
+@router.post("/exits")
+async def update_exit_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Update the global PositionManager exit configuration at runtime.
+
+    Args:
+        config: Dict with any subset of :class:`~polystation.automation.position_manager.ExitConfig`
+            fields.  Unknown keys are silently ignored.
+
+    Returns:
+        Updated status dict after applying the new config, or an error dict
+        when the PositionManager has not been initialized.
+    """
+    eng = get_engine()
+    if not eng.position_manager:
+        return {"error": "PositionManager not initialized"}
+    from polystation.automation.position_manager import ExitConfig
+    new_config = ExitConfig(
+        trailing_stop_pct=config.get("trailing_stop_pct"),
+        profit_target_pct=config.get("profit_target_pct"),
+        stop_loss_pct=config.get("stop_loss_pct"),
+        max_hold_hours=config.get("max_hold_hours"),
+        expiry_exit_hours=config.get("expiry_exit_hours", 2.0),
+        enabled=config.get("enabled", False),
+    )
+    eng.position_manager.set_config(None, new_config)
+    return eng.position_manager.get_status()
+
+
 @router.get("/positions")
 def risk_positions() -> list[dict[str, Any]]:
     """Return all open positions with risk metrics.

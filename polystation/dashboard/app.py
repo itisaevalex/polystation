@@ -95,12 +95,50 @@ async def lifespan(app: FastAPI):
     engine.metrics.set_database(engine.db)
     engine.execution.db = engine.db
 
+    # Restore state from previous session
+    if engine.db:
+        try:
+            state = engine.db.restore_portfolio_state()
+            if state.get("positions"):
+                for pos_dict in state["positions"]:
+                    # Hydrate portfolio with saved positions
+                    engine.portfolio.record_fill(
+                        token_id=pos_dict["token_id"],
+                        side=pos_dict.get("side", "BUY"),
+                        price=pos_dict.get("avg_entry_price", 0),
+                        size=pos_dict.get("size", 0),
+                        market_id=pos_dict.get("market_id", ""),
+                        outcome=pos_dict.get("outcome", ""),
+                    )
+                engine.portfolio.realized_pnl = state.get("realized_pnl", 0.0)
+                engine.portfolio.trade_count = state.get("trade_count", 0)
+                logger.info(
+                    "Restored %d positions, P&L: $%.2f from previous session",
+                    len(state["positions"]),
+                    state.get("realized_pnl", 0),
+                )
+        except Exception:
+            logger.exception("Failed to restore state from database")
+
     await engine.start()
+
+    # PositionManager — auto-exit rules (disabled by default)
+    from polystation.automation.position_manager import PositionManager, ExitConfig
+    exit_config = ExitConfig(
+        trailing_stop_pct=None,
+        profit_target_pct=None,
+        stop_loss_pct=None,
+        max_hold_hours=None,
+        expiry_exit_hours=2.0,
+        enabled=False,  # user enables from Risk tab
+    )
+    engine.position_manager = PositionManager(engine, config=exit_config, check_interval=10.0)
 
     # Background tasks
     tasks = [
         asyncio.create_task(engine.metrics.run_snapshots()),
         asyncio.create_task(_prometheus_scrape_loop(engine.prom, engine)),
+        asyncio.create_task(engine.position_manager.start()),
     ]
     if engine.redis and engine.redis.connected:
         tasks.append(asyncio.create_task(_redis_heartbeat_loop(engine.redis)))
@@ -113,6 +151,9 @@ async def lifespan(app: FastAPI):
     engine.metrics.stop()
     for t in tasks:
         t.cancel()
+
+    if engine.position_manager:
+        await engine.position_manager.stop()
 
     for ex in engine.exchanges.values():
         await ex.disconnect()
@@ -145,6 +186,7 @@ def create_app() -> FastAPI:
     from polystation.dashboard.api.performance import router as performance_router
     from polystation.dashboard.api.risk import router as risk_router
     from polystation.dashboard.api.metrics_endpoint import router as metrics_router
+    from polystation.dashboard.api.backtest import router as backtest_router
     from polystation.dashboard.ws import router as ws_router
 
     app.include_router(markets_router, prefix="/api/markets", tags=["markets"])
@@ -155,6 +197,7 @@ def create_app() -> FastAPI:
     app.include_router(performance_router, prefix="/api/performance", tags=["performance"])
     app.include_router(risk_router, prefix="/api/risk", tags=["risk"])
     app.include_router(metrics_router, tags=["metrics"])
+    app.include_router(backtest_router, prefix="/api/backtest", tags=["backtest"])
     app.include_router(ws_router, tags=["websocket"])
 
     # Static files (SPA) — mount last so API routes take precedence

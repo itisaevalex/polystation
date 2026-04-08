@@ -100,8 +100,8 @@ function flash(el, cls) {
 // ------------------------------------------------------------------ //
 // API helpers                                                          //
 // ------------------------------------------------------------------ //
-async function apiFetch(path) {
-  const resp = await fetch(path);
+async function apiFetch(path, options) {
+  const resp = await fetch(path, options);
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
     throw new Error(`HTTP ${resp.status}: ${text}`);
@@ -493,6 +493,14 @@ function renderPriceSummary(price) {
   if (spreadEl) { spreadEl.textContent = fmtPrice(price.spread); }
   if (bidEl) { bidEl.textContent = fmtPrice(price.best_bid); }
   if (askEl) { askEl.textContent = fmtPrice(price.best_ask); }
+
+  // Auto-fill Quick Trade price from the midpoint when the field is empty
+  if (price.midpoint != null) {
+    const qtPriceEl = $("#qt-price");
+    if (qtPriceEl && !qtPriceEl.value) {
+      qtPriceEl.value = Number(price.midpoint).toFixed(4);
+    }
+  }
 }
 
 function renderOrderBook(book) {
@@ -1228,6 +1236,15 @@ function bindNavTabs() {
           startPerfPolling();
         }
         if (btn.dataset.tab === "risk")        refreshRisk();
+        if (btn.dataset.tab === "backtest") {
+          // Auto-fill token_id from the currently selected market
+          if (State.selectedMarket && State.selectedMarket.token_ids?.length) {
+            const btInput = document.getElementById("bt-token-id");
+            if (btInput && !btInput.value) {
+              btInput.value = State.selectedMarket.token_ids[State.selectedTokenIdx || 0];
+            }
+          }
+        }
       }
 
       // Stop performance polling when leaving the performance tab
@@ -1438,6 +1455,147 @@ function startPolling(intervalSec) {
 }
 
 // ------------------------------------------------------------------ //
+// Quick Trade                                                           //
+// ------------------------------------------------------------------ //
+function bindQuickTrade() {
+  const buyBtn = document.getElementById("qt-buy");
+  const sellBtn = document.getElementById("qt-sell");
+  if (!buyBtn || !sellBtn) return;
+
+  async function quickTrade(side) {
+    const tokenId = State.selectedMarket?.token_ids?.[State.selectedTokenIdx || 0];
+    if (!tokenId) { addLog("WARN", "Select a market first"); return; }
+    const price = parseFloat(document.getElementById("qt-price")?.value);
+    const size = parseFloat(document.getElementById("qt-size")?.value || "50");
+    if (!price || price <= 0) { addLog("WARN", "Enter a valid price"); return; }
+
+    try {
+      const result = await apiFetch("/api/orders/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token_id: tokenId, side, price, size }),
+      });
+      addLog("TRADE", `${side} ${size} @ ${price.toFixed(4)} → ${result.order?.status || "?"}`);
+      refreshOrders();
+      refreshPortfolio();
+    } catch (e) {
+      addLog("ERROR", `Trade failed: ${e.message}`);
+    }
+  }
+
+  buyBtn.addEventListener("click", () => quickTrade("BUY"));
+  sellBtn.addEventListener("click", () => quickTrade("SELL"));
+}
+
+// ------------------------------------------------------------------ //
+// Backtest Tab                                                          //
+// ------------------------------------------------------------------ //
+function bindBacktestTab() {
+  const btn = document.getElementById("btn-run-backtest");
+  if (!btn) return;
+
+  btn.addEventListener("click", async () => {
+    const tokenId = document.getElementById("bt-token-id")?.value.trim();
+    const pricesRaw = document.getElementById("bt-prices")?.value.trim();
+    const balance = parseFloat(document.getElementById("bt-balance")?.value || "10000");
+    const kernel = document.getElementById("bt-kernel")?.value || "signal";
+    const statusEl = document.getElementById("bt-status");
+
+    if (!tokenId || !pricesRaw) {
+      if (statusEl) { statusEl.textContent = "Token ID and prices required"; statusEl.classList.add("visible", "error"); }
+      return;
+    }
+
+    const prices = pricesRaw.split(",").map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+    if (prices.length < 5) {
+      if (statusEl) { statusEl.textContent = "Need at least 5 prices"; statusEl.classList.add("visible", "error"); }
+      return;
+    }
+
+    const strategy = kernel === "signal-mr" ? "mean_reversion" : "momentum";
+
+    btn.disabled = true;
+    btn.textContent = "Running...";
+    if (statusEl) { statusEl.textContent = ""; statusEl.classList.remove("visible", "error"); }
+
+    try {
+      const result = await apiFetch("/api/backtest/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kernel_type: "signal",
+          strategy,
+          token_id: tokenId,
+          prices,
+          start_balance: balance,
+        }),
+      });
+
+      document.getElementById("bt-results").style.display = "block";
+
+      // Render stats
+      const pnlEl = document.getElementById("bt-pnl");
+      if (pnlEl) {
+        pnlEl.textContent = `$${result.total_pnl.toFixed(2)}`;
+        pnlEl.className = `val ${result.total_pnl > 0 ? "pos" : result.total_pnl < 0 ? "neg" : "neu"}`;
+      }
+      const wrEl = document.getElementById("bt-winrate");
+      if (wrEl) wrEl.textContent = `${(result.win_rate * 100).toFixed(1)}%`;
+      const trEl = document.getElementById("bt-trades");
+      if (trEl) trEl.textContent = result.total_trades;
+      const ddEl = document.getElementById("bt-drawdown");
+      if (ddEl) ddEl.textContent = `$${result.max_drawdown.toFixed(2)}`;
+      const shEl = document.getElementById("bt-sharpe");
+      if (shEl) shEl.textContent = result.sharpe_ratio.toFixed(2);
+
+      // Render P&L chart
+      if (result.pnl_curve && result.pnl_curve.length > 0 && typeof Chart !== "undefined") {
+        const canvas = document.getElementById("bt-pnl-chart");
+        if (canvas) {
+          const ctx = canvas.getContext("2d");
+          if (window._btChart) window._btChart.destroy();
+          window._btChart = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: result.pnl_curve.map((_, i) => i),
+              datasets: [{
+                label: "P&L",
+                data: result.pnl_curve,
+                borderColor: result.total_pnl >= 0 ? "#00ff88" : "#ff4444",
+                backgroundColor: result.total_pnl >= 0 ? "rgba(0,255,136,0.1)" : "rgba(255,68,68,0.1)",
+                fill: true,
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2,
+              }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { display: false },
+                y: {
+                  grid: { color: "rgba(30,30,53,0.5)" },
+                  ticks: { color: "#8888aa", font: { family: "'JetBrains Mono'" } },
+                },
+              },
+            },
+          });
+        }
+      }
+
+      addLog("INFO", `Backtest complete: ${result.summary}`);
+    } catch (e) {
+      if (statusEl) { statusEl.textContent = `Error: ${e.message}`; statusEl.classList.add("visible", "error"); }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Run Backtest";
+    }
+  });
+}
+
+// ------------------------------------------------------------------ //
 // Initial load                                                          //
 // ------------------------------------------------------------------ //
 async function init() {
@@ -1451,6 +1609,8 @@ async function init() {
   bindClearLog();
   bindLogsTab();
   bindSettingsTab();
+  bindQuickTrade();
+  bindBacktestTab();
 
   // Load persisted settings
   loadSettingsFromStorage();
@@ -1475,6 +1635,142 @@ async function init() {
   const savedInterval = raw ? (JSON.parse(raw).refreshInterval || 5) : 5;
   startPolling(savedInterval);
 }
+
+/* ================================================================
+   PRICE HISTORY CHART — Modal overlay for market price graphs
+   ================================================================ */
+
+let _priceChart = null;
+let _chartTokenId = null;
+
+function showPriceChart() {
+  const tokenId = State.selectedMarket?.token_ids?.[State.selectedTokenIdx || 0];
+  if (!tokenId) { addLog("WARN", "Select a market first to view price history"); return; }
+  _chartTokenId = tokenId;
+
+  const modal = document.getElementById("chart-modal");
+  if (modal) modal.style.display = "flex";
+
+  const title = document.getElementById("chart-modal-title");
+  if (title) title.textContent = (State.selectedMarket?.question || "Price History").substring(0, 80);
+
+  loadPriceHistory("max");
+}
+
+function closeChartModal() {
+  const modal = document.getElementById("chart-modal");
+  if (modal) modal.style.display = "none";
+  if (_priceChart) { _priceChart.destroy(); _priceChart = null; }
+}
+
+// Close on Escape key
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeChartModal();
+});
+
+// Close on clicking backdrop
+document.getElementById("chart-modal")?.addEventListener("click", (e) => {
+  if (e.target.id === "chart-modal") closeChartModal();
+});
+
+async function loadPriceHistory(interval) {
+  if (!_chartTokenId) return;
+
+  const fidelity = { "1d": 5, "1w": 30, "1m": 60, "max": 120 }[interval] || 120;
+
+  try {
+    const resp = await apiFetch(`/api/markets/history/${_chartTokenId}?interval=${interval}&fidelity=${fidelity}`);
+    const history = resp.history || [];
+
+    const pointsEl = document.getElementById("chart-points");
+    if (pointsEl) pointsEl.textContent = `${history.length} data points`;
+
+    if (history.length > 0) {
+      const rangeEl = document.getElementById("chart-range");
+      const firstDate = new Date(history[0].t * 1000).toLocaleDateString();
+      const lastDate = new Date(history[history.length - 1].t * 1000).toLocaleDateString();
+      if (rangeEl) rangeEl.textContent = `${firstDate} — ${lastDate}`;
+    }
+
+    renderPriceHistoryChart(history, interval);
+  } catch (e) {
+    addLog("ERROR", `Price history failed: ${e.message}`);
+  }
+}
+
+function renderPriceHistoryChart(history, interval) {
+  if (!history.length || typeof Chart === "undefined") return;
+
+  const canvas = document.getElementById("price-history-chart");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  if (_priceChart) _priceChart.destroy();
+
+  const labels = history.map(h => {
+    const d = new Date(h.t * 1000);
+    return interval === "1d"
+      ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : d.toLocaleDateString([], { month: "short", day: "numeric" });
+  });
+  const prices = history.map(h => h.p);
+  const firstPrice = prices[0];
+  const lastPrice = prices[prices.length - 1];
+  const isUp = lastPrice >= firstPrice;
+
+  _priceChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Price",
+        data: prices,
+        borderColor: isUp ? "#00ff88" : "#ff4444",
+        backgroundColor: isUp ? "rgba(0,255,136,0.08)" : "rgba(255,68,68,0.08)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        pointHitRadius: 8,
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: "index" },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "rgba(15,15,26,0.95)",
+          titleColor: "#8888aa",
+          bodyColor: "#e8e8f0",
+          borderColor: "#2a2a4a",
+          borderWidth: 1,
+          titleFont: { family: "'JetBrains Mono'" },
+          bodyFont: { family: "'JetBrains Mono'" },
+          callbacks: {
+            label: (ctx) => `$${ctx.parsed.y.toFixed(4)}`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: "rgba(30,30,53,0.5)" },
+          ticks: { color: "#6666aa", font: { family: "'JetBrains Mono'", size: 10 }, maxTicksLimit: 12 },
+        },
+        y: {
+          grid: { color: "rgba(30,30,53,0.5)" },
+          ticks: {
+            color: "#8888aa",
+            font: { family: "'JetBrains Mono'", size: 10 },
+            callback: (v) => `$${v.toFixed(2)}`,
+          },
+        }
+      }
+    }
+  });
+}
+
 
 /* ================================================================
    PANEL RESIZE — Drag handles between grid areas

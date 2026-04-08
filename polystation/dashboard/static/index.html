@@ -63,6 +63,7 @@
     <button class="nav-tab" data-tab="settings">Settings</button>
     <button class="nav-tab" data-tab="performance">Performance</button>
     <button class="nav-tab" data-tab="risk">Risk</button>
+    <button class="nav-tab" data-tab="backtest">Backtest</button>
   </nav>
 
   <!-- ============================================================
@@ -127,6 +128,7 @@
         <div class="panel-header">
           <span class="panel-title">Order Book</span>
           <div class="panel-actions">
+            <button class="btn btn-sm" onclick="showPriceChart()" title="Price chart" style="font-size:11px;">&#x1F4C8;</button>
             <button class="btn btn-sm" onclick="refreshOrderBook()" title="Refresh order book">&#8635;</button>
           </div>
         </div>
@@ -176,6 +178,19 @@
             <div id="ob-asks">
               <div class="state-empty">No data</div>
             </div>
+          </div>
+        </div>
+
+        <!-- Quick Trade form -->
+        <div id="quick-trade" style="padding:8px; border-top:1px solid var(--border); background:var(--bg-header); flex-shrink:0;">
+          <div style="font-size:9px; color:var(--text-label); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px;">Quick Trade</div>
+          <div style="display:flex; gap:4px; margin-bottom:4px;">
+            <button id="qt-buy" class="btn btn-green btn-sm" style="flex:1;">BUY</button>
+            <button id="qt-sell" class="btn btn-red btn-sm" style="flex:1;">SELL</button>
+          </div>
+          <div style="display:flex; gap:4px;">
+            <input type="number" id="qt-price" class="form-input" placeholder="Price" style="flex:1; font-size:10px;" step="0.01" />
+            <input type="number" id="qt-size" class="form-input" placeholder="Size" style="flex:1; font-size:10px;" step="1" value="50" />
           </div>
         </div>
       </div>
@@ -653,7 +668,82 @@
 
   </div><!-- /#tab-risk -->
 
+  <!-- ============================================================
+       BACKTEST TAB
+       ============================================================ -->
+  <div id="tab-backtest" class="tab-content">
+
+    <!-- Backtest configuration form -->
+    <div class="settings-section" style="margin:16px; max-width:600px;">
+      <div class="settings-section-header">Run Backtest</div>
+      <div class="settings-field">
+        <label class="settings-label">Kernel</label>
+        <select id="bt-kernel" class="settings-input">
+          <option value="signal">Signal (Momentum)</option>
+          <option value="signal-mr">Signal (Mean Reversion)</option>
+        </select>
+      </div>
+      <div class="settings-field">
+        <label class="settings-label">Token ID</label>
+        <input type="text" id="bt-token-id" class="settings-input" placeholder="Paste token_id or select from markets" autocomplete="off" />
+      </div>
+      <div class="settings-field">
+        <label class="settings-label">Price Sequence</label>
+        <textarea id="bt-prices" class="settings-input" rows="4" placeholder="Comma-separated prices, e.g.: 0.45,0.47,0.50,0.48,0.52,0.55,0.53..." style="font-size:10px;"></textarea>
+      </div>
+      <div class="settings-field">
+        <label class="settings-label">Start Balance</label>
+        <input type="number" id="bt-balance" class="settings-input settings-input-short" value="10000" />
+      </div>
+      <div class="settings-actions">
+        <button id="btn-run-backtest" class="btn btn-green">Run Backtest</button>
+        <span id="bt-status" class="settings-status"></span>
+      </div>
+    </div>
+
+    <!-- Backtest results -->
+    <div id="bt-results" style="margin:0 16px 16px; display:none;">
+      <div class="settings-section">
+        <div class="settings-section-header">Results</div>
+        <div class="perf-stats-bar" id="bt-stats-bar">
+          <div class="perf-stat-cell"><div class="lbl">Total P&amp;L</div><div id="bt-pnl" class="val neu">—</div></div>
+          <div class="perf-stat-cell"><div class="lbl">Win Rate</div><div id="bt-winrate" class="val">—</div></div>
+          <div class="perf-stat-cell"><div class="lbl">Trades</div><div id="bt-trades" class="val">—</div></div>
+          <div class="perf-stat-cell"><div class="lbl">Max Drawdown</div><div id="bt-drawdown" class="val">—</div></div>
+          <div class="perf-stat-cell"><div class="lbl">Sharpe</div><div id="bt-sharpe" class="val">—</div></div>
+        </div>
+      </div>
+      <div class="perf-chart-container" style="margin-top:8px;">
+        <canvas id="bt-pnl-chart"></canvas>
+      </div>
+    </div>
+
+  </div><!-- /#tab-backtest -->
+
 </div><!-- /#app -->
+
+<!-- Price chart modal overlay -->
+<div id="chart-modal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.85); align-items:center; justify-content:center;">
+  <div style="background:var(--bg-panel); border:1px solid var(--border-bright); border-radius:var(--radius-lg); width:80vw; max-width:1000px; max-height:80vh; display:flex; flex-direction:column; overflow:hidden;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--bg-header);">
+      <span id="chart-modal-title" style="font-size:12px; font-weight:700; color:var(--green); letter-spacing:1px;">Price History</span>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button class="btn btn-sm" onclick="loadPriceHistory('1d')">1D</button>
+        <button class="btn btn-sm" onclick="loadPriceHistory('1w')">1W</button>
+        <button class="btn btn-sm" onclick="loadPriceHistory('1m')">1M</button>
+        <button class="btn btn-sm btn-green" onclick="loadPriceHistory('max')">ALL</button>
+        <button class="btn btn-sm" onclick="closeChartModal()" style="margin-left:8px;">&#10005;</button>
+      </div>
+    </div>
+    <div style="padding:16px; flex:1; min-height:300px;">
+      <canvas id="price-history-chart"></canvas>
+    </div>
+    <div id="chart-modal-footer" style="padding:8px 16px; border-top:1px solid var(--border); font-size:10px; color:var(--text-muted); display:flex; gap:16px;">
+      <span id="chart-points">—</span>
+      <span id="chart-range">—</span>
+    </div>
+  </div>
+</div>
 
 <script src="app.js"></script>
 </body>

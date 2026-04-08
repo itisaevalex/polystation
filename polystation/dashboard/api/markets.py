@@ -142,3 +142,26 @@ def api_health() -> dict[str, Any]:
         return {"clob": False, "server_time": None, "error": str(exc)}
 
     return {"clob": healthy, "server_time": server_time}
+
+
+@router.get("/history/{token_id}", summary="Price history for a token")
+def price_history(token_id: str, interval: str = "max", fidelity: int = 120) -> dict[str, Any]:
+    """Return historical price points for *token_id* from the CLOB prices-history API.
+
+    Each point is ``{"t": unix_timestamp, "p": price}``.
+    """
+    import requests as _req
+
+    try:
+        resp = _req.get(
+            "https://clob.polymarket.com/prices-history",
+            params={"market": token_id, "interval": interval, "fidelity": str(fidelity)},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        history = data.get("history", [])
+        return {"token_id": token_id, "interval": interval, "count": len(history), "history": history}
+    except Exception as exc:
+        logger.error("Price history fetch failed for %s: %s", token_id[:20], exc)
+        raise HTTPException(502, f"CLOB API error: {exc}") from exc
